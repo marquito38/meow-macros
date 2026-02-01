@@ -35,11 +35,11 @@
         
         /* Animations */
         @keyframes swat {
-            0% { transform: translateX(100%) rotate(45deg); opacity: 0; }
+            0% { transform: translateX(120%) rotate(45deg); opacity: 0; }
             50% { transform: translateX(0) rotate(0deg); opacity: 1; }
-            100% { transform: translateX(-20px) rotate(-10deg); opacity: 0; }
+            100% { transform: translateX(-50px) rotate(-10deg); opacity: 0; }
         }
-        .animate-swat { animation: swat 0.6s ease-in-out forwards; }
+        .animate-swat { animation: swat 1s ease-in-out forwards; }
 
         @keyframes bounce-cat { 
             0%, 100% { transform: translateY(0); } 
@@ -100,8 +100,22 @@
         // --- CONSTANTS & HELPERS ---
         const GOALS = { calories: 1300, carbs: 114, protein: 130, fat: 36, fiber: 30 };
         
-        // 1g Carbs = 4cal, 1g Protein = 4cal, 1g Fat = 9cal
         const calcCals = (c, p, f) => Math.round((c * 4) + (p * 4) + (f * 9));
+
+        const getFoodEmoji = (name) => {
+            const n = name.toLowerCase();
+            if (n.includes('egg')) return '🥚';
+            if (n.includes('banana')) return '🍌';
+            if (n.includes('yogurt')) return '🥣';
+            if (n.includes('salmon') || n.includes('fish')) return '🐟';
+            if (n.includes('chicken') || n.includes('turkey')) return '🍗';
+            if (n.includes('avocado')) return '🥑';
+            if (n.includes('berry') || n.includes('fruit') || n.includes('apple')) return '🍓';
+            if (n.includes('corn')) return '🌽';
+            if (n.includes('bean') || n.includes('chickpea')) return '🫘';
+            if (n.includes('bread') || n.includes('toast')) return '🍞';
+            return '🥗';
+        };
 
         const STARTER_LIBRARY = [
             { id: '1', name: 'Egg Whites', carbs: 0, protein: 11.7, fat: 0, fiber: 0 },
@@ -118,11 +132,39 @@
 
         // --- COMPONENTS ---
 
-        const CatPaw = ({ trigger }) => {
+        const CatGif = ({ type, className }) => {
+            const [error, setError] = useState(false);
+            
+            // GIFs
+            const gifs = {
+                swat: "https://media1.giphy.com/media/WDxb2uP9L4X3G/giphy.gif",
+                happy: "https://media3.giphy.com/media/GeimqsH0TLDt4tScGw/giphy.gif",
+                sleep: "https://media0.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif"
+            };
+
+            const fallbacks = {
+                swat: "🐾",
+                happy: "😻",
+                sleep: "💤"
+            };
+
+            if (error) return <span className={`flex items-center justify-center text-4xl ${className}`}>{fallbacks[type] || '🐱'}</span>;
+
+            return (
+                <img 
+                    src={gifs[type]} 
+                    alt="Cat Animation" 
+                    className={`object-cover rounded-2xl ${className}`} 
+                    onError={() => setError(true)}
+                />
+            );
+        };
+
+        const CatPawSwat = ({ trigger }) => {
             if (!trigger) return null;
             return (
-                <div className="fixed top-1/2 left-0 w-full h-full pointer-events-none z-50 flex items-center justify-center animate-swat">
-                    <div className="text-[150px]">🐾</div>
+                <div className="fixed top-1/2 left-0 w-full pointer-events-none z-[60] flex items-center justify-center animate-swat">
+                    <CatGif type="swat" className="w-64 h-64 rounded-full shadow-2xl border-4 border-white" />
                 </div>
             );
         };
@@ -165,9 +207,10 @@
             const [deferredPrompt, setDeferredPrompt] = useState(null);
 
             // Modal State
-            const [editFood, setEditFood] = useState({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0 });
-            const [isNew, setIsNew] = useState(true); // If true, we are adding NEW to library, else using existing
+            const [editFood, setEditFood] = useState({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack' });
+            const [isNew, setIsNew] = useState(true); 
             const [loadingAI, setLoadingAI] = useState(false);
+            const [librarySearch, setLibrarySearch] = useState('');
 
             // Refs
             const fiberChartRef = useRef(null);
@@ -176,7 +219,7 @@
 
             // Load/Save
             useEffect(() => {
-                const saved = localStorage.getItem('meow_data_v1');
+                const saved = localStorage.getItem('meow_data_v2'); // New version for schema change
                 if (saved) setData(JSON.parse(saved));
                 
                 const promptHandler = (e) => {
@@ -191,7 +234,7 @@
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('meow_data_v1', JSON.stringify(data));
+                localStorage.setItem('meow_data_v2', JSON.stringify(data));
                 if (window.lucide) window.lucide.createIcons();
             }, [data, view]);
 
@@ -205,6 +248,7 @@
             }), { c: 0, p: 0, f: 0, fib: 0 });
             
             const totalCals = calcCals(totals.c, totals.p, totals.f);
+            const goalMet = totals.fib >= GOALS.fiber;
 
             // --- ACTIONS ---
 
@@ -214,6 +258,7 @@
                     id: Date.now(),
                     name: food.name,
                     weight: weight,
+                    category: food.category || 'Snack',
                     c: food.carbs * factor,
                     p: food.protein * factor,
                     f: food.fat * factor,
@@ -234,7 +279,7 @@
                 
                 // Trigger Animation
                 setSwatTrigger(true);
-                setTimeout(() => setSwatTrigger(false), 1000);
+                setTimeout(() => setSwatTrigger(false), 1200);
             };
 
             const handleDeleteEntry = (id) => {
@@ -271,11 +316,20 @@
                     
                     const json = await response.json();
                     if (!json.candidates) throw new Error("No valid response from AI");
-                    const text = json.candidates[0].content.parts[0].text;
-                    return JSON.parse(text);
+                    
+                    let text = json.candidates[0].content.parts[0].text;
+                    // Robust stripping of markdown
+                    text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    
+                    try {
+                        return JSON.parse(text);
+                    } catch (parseError) {
+                        alert("AI Parsing Error. Raw response: " + text);
+                        return null;
+                    }
                 } catch (e) {
                     console.error(e);
-                    alert("AI Error: " + e.message);
+                    alert("AI Network Error: " + e.message);
                     return null;
                 } finally {
                     setLoadingAI(false);
@@ -315,11 +369,9 @@
             // --- CHARTS (Trends Screen) ---
             useEffect(() => {
                 if (view === 'trends') {
-                    // Cleanup old charts
                     if (fiberChartRef.current) fiberChartRef.current.destroy();
                     if (macroChartRef.current) macroChartRef.current.destroy();
 
-                    // 7 Day Fiber
                     const labels = [];
                     const dataPoints = [];
                     for (let i=6; i>=0; i--) {
@@ -348,7 +400,6 @@
                         });
                     }
 
-                    // Macro Pie
                     const ctxPie = document.getElementById('macroChart');
                     if (ctxPie) {
                         macroChartRef.current = new Chart(ctxPie, {
@@ -365,7 +416,6 @@
                     }
                 }
                 
-                // Cleanup function
                 return () => {
                     if (fiberChartRef.current) fiberChartRef.current.destroy();
                     if (macroChartRef.current) macroChartRef.current.destroy();
@@ -398,8 +448,13 @@
                     </div>
 
                     {/* Goals Card */}
-                    <div className="glass-panel p-5 rounded-3xl shadow-lg border-b-4 border-pink-200">
-                        <div className="flex justify-between items-end mb-4">
+                    <div className="glass-panel p-5 rounded-3xl shadow-lg border-b-4 border-pink-200 relative overflow-hidden">
+                        {goalMet && (
+                            <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none">
+                                <CatGif type="happy" className="w-24 h-24" />
+                            </div>
+                        )}
+                        <div className="flex justify-between items-end mb-4 relative z-10">
                             <div>
                                 <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Calories</h2>
                                 <p className="text-3xl font-black text-slate-700">{totalCals} <span className="text-sm text-slate-400">/ {GOALS.calories}</span></p>
@@ -424,7 +479,7 @@
                     <div className="grid grid-cols-2 gap-4">
                         <button 
                             onClick={() => {
-                                setEditFood({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0 });
+                                setEditFood({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack' });
                                 setIsNew(true);
                                 setModalOpen(true);
                             }}
@@ -449,7 +504,7 @@
                         <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
                             {data.library.slice(0, 10).map(item => (
                                 <div key={item.id} className="min-w-[120px] bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
-                                    <div className="text-2xl mb-1">🥗</div>
+                                    <div className="text-2xl mb-1">{getFoodEmoji(item.name)}</div>
                                     <p className="text-xs font-bold text-slate-700 truncate w-full">{item.name}</p>
                                     <p className="text-[9px] text-slate-400 mb-2">{Math.round(item.carbs)}c {Math.round(item.protein)}p</p>
                                     <button 
@@ -471,15 +526,18 @@
                     <div className="space-y-2">
                         <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Today's Bowl</h3>
                         {todayLog.length === 0 ? (
-                            <div className="text-center py-10 opacity-40">
-                                <span className="text-4xl block mb-2">🥣</span>
-                                <p className="text-xs font-bold uppercase">Empty Bowl...</p>
+                            <div className="text-center py-10 opacity-70">
+                                <CatGif type="sleep" className="w-32 h-32 mx-auto mb-2 opacity-80" />
+                                <p className="text-xs font-bold uppercase text-slate-400">Empty Bowl...</p>
                             </div>
                         ) : todayLog.map(item => (
-                            <div key={item.id} className="bg-white p-3 rounded-2xl shadow-sm flex justify-between items-center border-l-4 border-teal-400">
+                            <div key={item.id} className="bg-white p-3 rounded-2xl shadow-sm flex justify-between items-center border-l-4 border-teal-400 animate-in slide-in-from-bottom-2">
                                 <div>
-                                    <p className="font-bold text-slate-700 text-sm">{item.name}</p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black uppercase">{item.category}</span>
+                                        <p className="font-bold text-slate-700 text-sm">{item.name}</p>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
                                         {item.weight}g • {Math.round(calcCals(item.c, item.p, item.f))} cal • 
                                         <span className="text-emerald-500"> {item.fib.toFixed(1)}g Fib</span>
                                     </p>
@@ -495,9 +553,21 @@
 
             const renderLibrary = () => (
                 <div className="pb-20 safe-pb">
-                    <h2 className="text-2xl font-black text-slate-700 mb-4">Food Library</h2>
+                    <div className="sticky top-0 bg-[#FFF0F5] z-30 pb-4 pt-2">
+                        <h2 className="text-2xl font-black text-slate-700 mb-4">Food Library</h2>
+                        <div className="relative">
+                            <i data-lucide="search" className="absolute left-4 top-3 text-slate-400 w-4 h-4"></i>
+                            <input 
+                                className="w-full bg-white pl-10 pr-4 py-3 rounded-2xl shadow-sm outline-none focus:ring-2 ring-pink-300 font-bold text-sm text-slate-700" 
+                                placeholder="Search foods..." 
+                                value={librarySearch}
+                                onChange={e => setLibrarySearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    
                     <div className="space-y-3">
-                        {data.library.map(item => (
+                        {data.library.filter(i => i.name.toLowerCase().includes(librarySearch.toLowerCase())).map(item => (
                             <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm flex justify-between items-center">
                                 <div>
                                     <p className="font-bold text-slate-700">{item.name}</p>
@@ -560,7 +630,7 @@
                             />
                             <button 
                                 onClick={() => {
-                                    localStorage.setItem('meow_data_v1', JSON.stringify(data));
+                                    localStorage.setItem('meow_data_v2', JSON.stringify(data));
                                     alert("Key Saved!");
                                 }}
                                 className="bg-pink-500 text-white px-4 rounded-xl font-bold text-xs shadow-md hover:bg-pink-600 active:scale-95 transition-transform"
@@ -601,7 +671,7 @@
 
             return (
                 <div className="max-w-md mx-auto min-h-screen px-4 py-6 relative">
-                    <CatPaw trigger={swatTrigger} />
+                    <CatPawSwat trigger={swatTrigger} />
                     
                     {/* View Router */}
                     {view === 'home' && renderHome()}
@@ -619,23 +689,44 @@
 
                     {/* Add/Edit Modal */}
                     {modalOpen && (
-                        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-                            <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10">
+                        <div 
+                            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+                            onClick={() => setModalOpen(false)}
+                        >
+                            <div 
+                                className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10"
+                                onClick={e => e.stopPropagation()}
+                            >
                                 <div className="flex justify-between items-center mb-6">
                                     <h2 className="text-xl font-black text-slate-800 uppercase">{isNew ? 'New Entry' : 'Add Food'}</h2>
-                                    <button onClick={() => setModalOpen(false)} className="bg-slate-100 p-2 rounded-full"><i data-lucide="x" className="w-5 h-5"></i></button>
+                                    <button onClick={() => setModalOpen(false)} className="bg-slate-100 p-2 rounded-full hover:bg-slate-200 transition-colors"><i data-lucide="x" className="w-5 h-5"></i></button>
                                 </div>
 
                                 <div className="space-y-4 max-h-[70vh] overflow-y-auto no-scrollbar">
-                                    {/* Name Input */}
-                                    <div>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Food Name</label>
-                                        <input 
-                                            className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none focus:ring-2 ring-pink-300" 
-                                            value={editFood.name}
-                                            onChange={e => setEditFood({...editFood, name: e.target.value})}
-                                            placeholder="e.g. Tuna Salad"
-                                        />
+                                    {/* Name & Category */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Food Name</label>
+                                            <input 
+                                                className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none focus:ring-2 ring-pink-300 text-xs" 
+                                                value={editFood.name}
+                                                onChange={e => setEditFood({...editFood, name: e.target.value})}
+                                                placeholder="e.g. Tuna"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Category</label>
+                                            <select 
+                                                className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none focus:ring-2 ring-pink-300 text-xs"
+                                                value={editFood.category}
+                                                onChange={e => setEditFood({...editFood, category: e.target.value})}
+                                            >
+                                                <option>Breakfast</option>
+                                                <option>Lunch</option>
+                                                <option>Dinner</option>
+                                                <option>Snack</option>
+                                            </select>
+                                        </div>
                                     </div>
 
                                     {/* Weight Input */}
