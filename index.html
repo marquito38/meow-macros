@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f472b6">
+    <title>Meow Macros</title>
+    
+    <!-- PWA Icons -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' x='10' font-size='80'>🐱</text></svg>">
+    
+    <!-- CDNs -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        
+        body { 
+            font-family: 'Nunito', sans-serif; 
+            -webkit-tap-highlight-color: transparent; 
+            background-color: #FFF0F5; /* Lavender Blush */
+            background-image: radial-gradient(#fbcfe8 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        /* Animations */
+        @keyframes swat {
+            0% { transform: translateX(100%) rotate(45deg); opacity: 0; }
+            50% { transform: translateX(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateX(-20px) rotate(-10deg); opacity: 0; }
+        }
+        .animate-swat { animation: swat 0.6s ease-in-out forwards; }
+
+        @keyframes bounce-cat { 
+            0%, 100% { transform: translateY(0); } 
+            50% { transform: translateY(-10px); } 
+        }
+        .animate-bounce-cat { animation: bounce-cat 2s infinite; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Mobile safe area padding */
+        .safe-pb {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- PWA SETUP ---
+        const setupPWA = () => {
+            const manifest = {
+                "name": "Meow Macros",
+                "short_name": "MeowMacros",
+                "start_url": ".",
+                "display": "standalone",
+                "background_color": "#FFF0F5",
+                "theme_color": "#f472b6",
+                "icons": [{
+                    "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' x='10' font-size='80'>🐱</text></svg>",
+                    "sizes": "512x512",
+                    "type": "image/svg+xml",
+                    "purpose": "any maskable"
+                }]
+            };
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type: 'application/json'}));
+            document.head.appendChild(link);
+
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    self.addEventListener('install', e => self.skipWaiting());
+                    self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
+                `;
+                navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode], {type: 'application/javascript'})))
+                    .catch(err => console.log('SW Fail (Expected in some previews):', err));
+            }
+        };
+        try { setupPWA(); } catch (e) {}
+
+        // --- CONSTANTS & HELPERS ---
+        const GOALS = { calories: 1300, carbs: 114, protein: 130, fat: 36, fiber: 30 };
+        
+        // 1g Carbs = 4cal, 1g Protein = 4cal, 1g Fat = 9cal
+        const calcCals = (c, p, f) => Math.round((c * 4) + (p * 4) + (f * 9));
+
+        const STARTER_LIBRARY = [
+            { id: '1', name: 'Egg Whites', carbs: 0, protein: 11.7, fat: 0, fiber: 0 },
+            { id: '2', name: 'Greek Yogurt', carbs: 3.5, protein: 9.4, fat: 0, fiber: 0 },
+            { id: '3', name: 'Banana', carbs: 23, protein: 1, fat: 0.3, fiber: 2.6 },
+            { id: '4', name: 'Whole Egg', carbs: 0.7, protein: 12.6, fat: 9.5, fiber: 0 },
+            { id: '5', name: 'Salmon (Raw)', carbs: 0, protein: 22, fat: 12, fiber: 0 },
+            { id: '6', name: 'Garbanzo Beans', carbs: 17, protein: 5, fat: 1.5, fiber: 5 }, 
+            { id: '7', name: 'Corn', carbs: 7, protein: 0.8, fat: 0.4, fiber: 2 }, 
+            { id: '8', name: 'Mixed Berries', carbs: 9, protein: 0.5, fat: 0, fiber: 3 },
+            { id: '9', name: 'Avocado', carbs: 8.5, protein: 2, fat: 14.7, fiber: 6.7 },
+            { id: '10', name: 'Chicken Breast', carbs: 0, protein: 31, fat: 3.6, fiber: 0 }
+        ];
+
+        // --- COMPONENTS ---
+
+        const CatPaw = ({ trigger }) => {
+            if (!trigger) return null;
+            return (
+                <div className="fixed top-1/2 left-0 w-full h-full pointer-events-none z-50 flex items-center justify-center animate-swat">
+                    <div className="text-[150px]">🐾</div>
+                </div>
+            );
+        };
+
+        const ProgressBar = ({ current, max, color, label, reverse = false }) => {
+            const pct = Math.min(100, Math.max(0, (current / max) * 100));
+            const remaining = reverse ? Math.max(0, max - current) : current;
+            const isOver = reverse && current > max;
+            
+            return (
+                <div className="flex flex-col w-full mb-3">
+                    <div className="flex justify-between text-xs font-bold mb-1 text-slate-600 uppercase tracking-wider">
+                        <span>{label}</span>
+                        <span className={isOver ? 'text-red-500' : ''}>
+                            {Math.round(remaining)}g {reverse ? 'left' : 'done'}
+                        </span>
+                    </div>
+                    <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden">
+                        <div 
+                            className={`h-full transition-all duration-1000 ${color} ${isOver ? 'bg-red-500' : ''}`} 
+                            style={{ width: `${pct}%` }}
+                        ></div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN APP ---
+        function App() {
+            // State
+            const [view, setView] = useState('home');
+            const [data, setData] = useState({
+                history: {}, // Keyed by YYYY-MM-DD
+                library: STARTER_LIBRARY,
+                settings: { apiKey: '' }
+            });
+            const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+            const [modalOpen, setModalOpen] = useState(false);
+            const [swatTrigger, setSwatTrigger] = useState(false);
+            const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+            // Modal State
+            const [editFood, setEditFood] = useState({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0 });
+            const [isNew, setIsNew] = useState(true); // If true, we are adding NEW to library, else using existing
+            const [loadingAI, setLoadingAI] = useState(false);
+
+            // Refs
+            const fiberChartRef = useRef(null);
+            const macroChartRef = useRef(null);
+            const fileInputRef = useRef(null);
+
+            // Load/Save
+            useEffect(() => {
+                const saved = localStorage.getItem('meow_data_v1');
+                if (saved) setData(JSON.parse(saved));
+                
+                const promptHandler = (e) => {
+                    e.preventDefault();
+                    setDeferredPrompt(e);
+                };
+                window.addEventListener('beforeinstallprompt', promptHandler);
+                
+                if (window.lucide) window.lucide.createIcons();
+
+                return () => window.removeEventListener('beforeinstallprompt', promptHandler);
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('meow_data_v1', JSON.stringify(data));
+                if (window.lucide) window.lucide.createIcons();
+            }, [data, view]);
+
+            // Calculated Totals
+            const todayLog = data.history[date] || [];
+            const totals = todayLog.reduce((acc, item) => ({
+                c: acc.c + item.c,
+                p: acc.p + item.p,
+                f: acc.f + item.f,
+                fib: acc.fib + item.fib
+            }), { c: 0, p: 0, f: 0, fib: 0 });
+            
+            const totalCals = calcCals(totals.c, totals.p, totals.f);
+
+            // --- ACTIONS ---
+
+            const handleAddFood = (food, weight) => {
+                const factor = weight / 100;
+                const newEntry = {
+                    id: Date.now(),
+                    name: food.name,
+                    weight: weight,
+                    c: food.carbs * factor,
+                    p: food.protein * factor,
+                    f: food.fat * factor,
+                    fib: food.fiber * factor
+                };
+
+                // Add to history
+                const newHistory = { ...data.history, [date]: [newEntry, ...(data.history[date] || [])] };
+                
+                // Add to library if new
+                let newLibrary = [...data.library];
+                if (!data.library.find(i => i.name === food.name)) {
+                    newLibrary.push({ ...food, id: Date.now().toString() });
+                }
+
+                setData({ ...data, history: newHistory, library: newLibrary });
+                setModalOpen(false);
+                
+                // Trigger Animation
+                setSwatTrigger(true);
+                setTimeout(() => setSwatTrigger(false), 1000);
+            };
+
+            const handleDeleteEntry = (id) => {
+                const newLog = todayLog.filter(i => i.id !== id);
+                setData({ ...data, history: { ...data.history, [date]: newLog } });
+            };
+
+            const deleteLibraryItem = (id) => {
+                setData({ ...data, library: data.library.filter(i => i.id !== id) });
+            }
+
+            // --- AI FUNCTIONS ---
+
+            const callGemini = async (prompt, imageBase64 = null) => {
+                if (!data.settings.apiKey) {
+                    alert("Please set your Gemini API Key in Settings first!");
+                    return null;
+                }
+                setLoadingAI(true);
+                try {
+                    const parts = [{ text: prompt }];
+                    if (imageBase64) {
+                        parts.push({ inlineData: { mimeType: "image/jpeg", data: imageBase64 } });
+                    }
+                    
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${data.settings.apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            contents: [{ parts }],
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
+                    
+                    const json = await response.json();
+                    if (!json.candidates) throw new Error("No valid response from AI");
+                    const text = json.candidates[0].content.parts[0].text;
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error(e);
+                    alert("AI Error: " + e.message);
+                    return null;
+                } finally {
+                    setLoadingAI(false);
+                }
+            };
+
+            const handlePhoto = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                    const base64 = reader.result.split(',')[1];
+                    const prompt = "Analyze this food image. Return a JSON object with: name (string), carbs (number g per 100g), protein (number g per 100g), fat (number g per 100g), fiber (number g per 100g). Estimate specific values.";
+                    const result = await callGemini(prompt, base64);
+                    if (result) {
+                        setEditFood({ ...editFood, name: result.name, carbs: result.carbs, protein: result.protein, fat: result.fat, fiber: result.fiber });
+                        setIsNew(true);
+                        setModalOpen(true);
+                    }
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const askAIFiber = async () => {
+                if (!editFood.name) {
+                    alert("Please enter a food name first.");
+                    return;
+                }
+                const prompt = `Estimate the fiber content per 100g for "${editFood.name}". Return ONLY a JSON object: {"fiber": number}`;
+                const result = await callGemini(prompt);
+                if (result) {
+                    setEditFood(prev => ({ ...prev, fiber: result.fiber }));
+                }
+            };
+
+            // --- CHARTS (Trends Screen) ---
+            useEffect(() => {
+                if (view === 'trends') {
+                    // Cleanup old charts
+                    if (fiberChartRef.current) fiberChartRef.current.destroy();
+                    if (macroChartRef.current) macroChartRef.current.destroy();
+
+                    // 7 Day Fiber
+                    const labels = [];
+                    const dataPoints = [];
+                    for (let i=6; i>=0; i--) {
+                        const d = new Date();
+                        d.setDate(d.getDate() - i);
+                        const k = d.toISOString().split('T')[0];
+                        labels.push(d.toLocaleDateString('en-US', {weekday:'short'}));
+                        const log = data.history[k] || [];
+                        dataPoints.push(log.reduce((s, x) => s + x.fib, 0));
+                    }
+
+                    const ctxBar = document.getElementById('fiberChart');
+                    if (ctxBar) {
+                        fiberChartRef.current = new Chart(ctxBar, {
+                            type: 'bar',
+                            data: {
+                                labels,
+                                datasets: [{
+                                    label: 'Fiber (g)',
+                                    data: dataPoints,
+                                    backgroundColor: '#10b981',
+                                    borderRadius: 5
+                                }]
+                            },
+                            options: { responsive: true, maintainAspectRatio: false }
+                        });
+                    }
+
+                    // Macro Pie
+                    const ctxPie = document.getElementById('macroChart');
+                    if (ctxPie) {
+                        macroChartRef.current = new Chart(ctxPie, {
+                            type: 'doughnut',
+                            data: {
+                                labels: ['Carbs', 'Protein', 'Fat'],
+                                datasets: [{
+                                    data: [totals.c, totals.p, totals.f],
+                                    backgroundColor: ['#60a5fa', '#f472b6', '#fbbf24']
+                                }]
+                            },
+                            options: { responsive: true, maintainAspectRatio: false }
+                        });
+                    }
+                }
+                
+                // Cleanup function
+                return () => {
+                    if (fiberChartRef.current) fiberChartRef.current.destroy();
+                    if (macroChartRef.current) macroChartRef.current.destroy();
+                };
+            }, [view, data, totals]);
+
+
+            // --- RENDER HELPERS ---
+            
+            const renderHome = () => (
+                <div className="space-y-6 pb-20">
+                    {/* Header */}
+                    <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-4xl animate-bounce-cat">🐱</span>
+                            <h1 className="text-2xl font-black text-pink-500 tracking-tight">Meow Macros</h1>
+                        </div>
+                        {deferredPrompt && (
+                            <button onClick={() => {
+                                deferredPrompt.prompt();
+                                deferredPrompt.userChoice.then((choiceResult) => {
+                                    if (choiceResult.outcome === 'accepted') {
+                                        setDeferredPrompt(null);
+                                    }
+                                });
+                            }} className="bg-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg animate-pulse">
+                                Install App
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Goals Card */}
+                    <div className="glass-panel p-5 rounded-3xl shadow-lg border-b-4 border-pink-200">
+                        <div className="flex justify-between items-end mb-4">
+                            <div>
+                                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Calories</h2>
+                                <p className="text-3xl font-black text-slate-700">{totalCals} <span className="text-sm text-slate-400">/ {GOALS.calories}</span></p>
+                            </div>
+                            <div className="w-16 h-16 relative flex items-center justify-center">
+                                {/* Simple CSS Donut */}
+                                <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                                    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#ffe4e6" strokeWidth="4" />
+                                    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f472b6" strokeWidth="4" strokeDasharray={`${Math.min(100, (totalCals/GOALS.calories)*100)}, 100`} />
+                                </svg>
+                                <span className="absolute text-[8px] font-bold text-pink-500">{Math.round((totalCals/GOALS.calories)*100)}%</span>
+                            </div>
+                        </div>
+
+                        <ProgressBar current={totals.c} max={GOALS.carbs} color="bg-blue-400" label="Carbs" reverse={true} />
+                        <ProgressBar current={totals.p} max={GOALS.protein} color="bg-pink-400" label="Protein" reverse={true} />
+                        <ProgressBar current={totals.f} max={GOALS.fat} color="bg-amber-400" label="Fat" reverse={true} />
+                        <ProgressBar current={totals.fib} max={GOALS.fiber} color="bg-emerald-400" label="Fiber (Count Up)" reverse={false} />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <button 
+                            onClick={() => {
+                                setEditFood({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0 });
+                                setIsNew(true);
+                                setModalOpen(true);
+                            }}
+                            className="bg-teal-500 hover:bg-teal-600 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"
+                        >
+                            <i data-lucide="plus-circle" className="w-6 h-6"></i>
+                            Add Food
+                        </button>
+                        <button 
+                            onClick={() => fileInputRef.current.click()}
+                            className="bg-indigo-500 hover:bg-indigo-600 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"
+                        >
+                            <i data-lucide="camera" className="w-6 h-6"></i>
+                            AI Scan
+                        </button>
+                        <input type="file" ref={fileInputRef} onChange={handlePhoto} accept="image/*" className="hidden" />
+                    </div>
+
+                    {/* Quick Add / Recent */}
+                    <div>
+                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-3">Quick Add</h3>
+                        <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
+                            {data.library.slice(0, 10).map(item => (
+                                <div key={item.id} className="min-w-[120px] bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
+                                    <div className="text-2xl mb-1">🥗</div>
+                                    <p className="text-xs font-bold text-slate-700 truncate w-full">{item.name}</p>
+                                    <p className="text-[9px] text-slate-400 mb-2">{Math.round(item.carbs)}c {Math.round(item.protein)}p</p>
+                                    <button 
+                                        onClick={() => {
+                                            setEditFood({ ...item, weight: 100 }); // Default 100g
+                                            setIsNew(false);
+                                            setModalOpen(true);
+                                        }}
+                                        className="bg-pink-100 text-pink-500 rounded-full p-1 hover:bg-pink-200"
+                                    >
+                                        <i data-lucide="plus" className="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Daily Log */}
+                    <div className="space-y-2">
+                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Today's Bowl</h3>
+                        {todayLog.length === 0 ? (
+                            <div className="text-center py-10 opacity-40">
+                                <span className="text-4xl block mb-2">🥣</span>
+                                <p className="text-xs font-bold uppercase">Empty Bowl...</p>
+                            </div>
+                        ) : todayLog.map(item => (
+                            <div key={item.id} className="bg-white p-3 rounded-2xl shadow-sm flex justify-between items-center border-l-4 border-teal-400">
+                                <div>
+                                    <p className="font-bold text-slate-700 text-sm">{item.name}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">
+                                        {item.weight}g • {Math.round(calcCals(item.c, item.p, item.f))} cal • 
+                                        <span className="text-emerald-500"> {item.fib.toFixed(1)}g Fib</span>
+                                    </p>
+                                </div>
+                                <button onClick={() => handleDeleteEntry(item.id)} className="text-slate-300 hover:text-red-400">
+                                    <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            const renderLibrary = () => (
+                <div className="pb-20">
+                    <h2 className="text-2xl font-black text-slate-700 mb-4">Food Library</h2>
+                    <div className="space-y-3">
+                        {data.library.map(item => (
+                            <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm flex justify-between items-center">
+                                <div>
+                                    <p className="font-bold text-slate-700">{item.name}</p>
+                                    <p className="text-[10px] text-slate-400 uppercase">Per 100g: C:{item.carbs} P:{item.protein} F:{item.fat}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => { setEditFood({...item, weight: 100}); setIsNew(true); setModalOpen(true); }} className="p-2 bg-indigo-50 text-indigo-500 rounded-xl">
+                                        <i data-lucide="edit-2" className="w-4 h-4"></i>
+                                    </button>
+                                    <button onClick={() => deleteLibraryItem(item.id)} className="p-2 bg-red-50 text-red-500 rounded-xl">
+                                        <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            const renderTrends = () => (
+                <div className="pb-20 space-y-6">
+                    <h2 className="text-2xl font-black text-slate-700">Trends</h2>
+                    
+                    <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
+                        <h3 className="text-xs font-black text-slate-400 uppercase mb-2">7-Day Fiber</h3>
+                        <div className="h-52">
+                            <canvas id="fiberChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white p-4 rounded-3xl shadow-sm h-48">
+                            <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Macro Split</h3>
+                            <div className="h-32">
+                                <canvas id="macroChart"></canvas>
+                            </div>
+                        </div>
+                        <div className="bg-pink-50 p-4 rounded-3xl shadow-sm flex flex-col items-center justify-center text-center">
+                            <span className="text-2xl mb-2">🔥</span>
+                            <p className="text-3xl font-black text-pink-500">{Math.round(totalCals)}</p>
+                            <p className="text-[10px] font-bold text-pink-300 uppercase">Calories Today</p>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderSettings = () => (
+                <div className="pb-20 space-y-6">
+                    <h2 className="text-2xl font-black text-slate-700">Settings</h2>
+                    
+                    <div className="bg-white p-5 rounded-3xl shadow-sm space-y-4">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><i data-lucide="key" className="w-4 h-4"></i> Gemini API Key</h3>
+                        <input 
+                            type="password" 
+                            placeholder="Paste API Key here..."
+                            className="w-full bg-slate-100 p-3 rounded-xl text-sm font-mono outline-none border-2 border-transparent focus:border-pink-300 transition-colors"
+                            value={data.settings.apiKey}
+                            onChange={e => setData({...data, settings: {...data.settings, apiKey: e.target.value}})}
+                        />
+                        <p className="text-[10px] text-slate-400">Required for AI Food Scan & Fiber estimates.</p>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-3xl shadow-sm space-y-3">
+                        <h3 className="font-bold text-slate-700">Data Management</h3>
+                        <button 
+                            onClick={() => {
+                                const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url; a.download = 'meow_data.json'; a.click();
+                            }}
+                            className="w-full bg-indigo-50 text-indigo-600 py-3 rounded-xl font-bold text-sm"
+                        >
+                            Export Data (JSON)
+                        </button>
+                        <button 
+                            onClick={() => {
+                                if(confirm("Are you sure? This deletes everything!")) {
+                                    localStorage.clear();
+                                    window.location.reload();
+                                }
+                            }}
+                            className="w-full bg-red-50 text-red-600 py-3 rounded-xl font-bold text-sm"
+                        >
+                            Clear All Data
+                        </button>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen px-4 py-6 relative">
+                    <CatPaw trigger={swatTrigger} />
+                    
+                    {/* View Router */}
+                    {view === 'home' && renderHome()}
+                    {view === 'library' && renderLibrary()}
+                    {view === 'trends' && renderTrends()}
+                    {view === 'settings' && renderSettings()}
+
+                    {/* Bottom Nav */}
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[380px] bg-white/90 backdrop-blur-md border border-white/50 shadow-xl rounded-full p-2 flex justify-around items-center z-40 safe-pb">
+                        <button onClick={() => setView('home')} className={`p-3 rounded-full transition-all ${view==='home'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="home" className="w-6 h-6"></i></button>
+                        <button onClick={() => setView('library')} className={`p-3 rounded-full transition-all ${view==='library'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="book" className="w-6 h-6"></i></button>
+                        <button onClick={() => setView('trends')} className={`p-3 rounded-full transition-all ${view==='trends'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="bar-chart-2" className="w-6 h-6"></i></button>
+                        <button onClick={() => setView('settings')} className={`p-3 rounded-full transition-all ${view==='settings'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="settings" className="w-6 h-6"></i></button>
+                    </nav>
+
+                    {/* Add/Edit Modal */}
+                    {modalOpen && (
+                        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-black text-slate-800 uppercase">{isNew ? 'New Entry' : 'Add Food'}</h2>
+                                    <button onClick={() => setModalOpen(false)} className="bg-slate-100 p-2 rounded-full"><i data-lucide="x" className="w-5 h-5"></i></button>
+                                </div>
+
+                                <div className="space-y-4 max-h-[70vh] overflow-y-auto no-scrollbar">
+                                    {/* Name Input */}
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Food Name</label>
+                                        <input 
+                                            className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none focus:ring-2 ring-pink-300" 
+                                            value={editFood.name}
+                                            onChange={e => setEditFood({...editFood, name: e.target.value})}
+                                            placeholder="e.g. Tuna Salad"
+                                        />
+                                    </div>
+
+                                    {/* Weight Input */}
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Weight (grams)</label>
+                                        <div className="flex items-center gap-2">
+                                            <input 
+                                                type="number"
+                                                className="flex-1 bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none focus:ring-2 ring-pink-300 text-center" 
+                                                value={editFood.weight}
+                                                onChange={e => setEditFood({...editFood, weight: Number(e.target.value)})}
+                                            />
+                                            <span className="text-slate-400 font-black">g</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Macros per 100g */}
+                                    <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                                        <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Values per 100g (Reference)</p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="ml-2 text-[9px] font-bold uppercase text-slate-400">Carbs</label>
+                                                <input type="number" className="w-full p-2 rounded-xl text-center font-bold" value={editFood.carbs} onChange={e => setEditFood({...editFood, carbs: Number(e.target.value)})} />
+                                            </div>
+                                            <div>
+                                                <label className="ml-2 text-[9px] font-bold uppercase text-slate-400">Protein</label>
+                                                <input type="number" className="w-full p-2 rounded-xl text-center font-bold" value={editFood.protein} onChange={e => setEditFood({...editFood, protein: Number(e.target.value)})} />
+                                            </div>
+                                            <div>
+                                                <label className="ml-2 text-[9px] font-bold uppercase text-slate-400">Fat</label>
+                                                <input type="number" className="w-full p-2 rounded-xl text-center font-bold" value={editFood.fat} onChange={e => setEditFood({...editFood, fat: Number(e.target.value)})} />
+                                            </div>
+                                            <div className="relative">
+                                                <label className="ml-2 text-[9px] font-bold uppercase text-emerald-500">Fiber</label>
+                                                <div className="flex gap-1">
+                                                    <input type="number" className="w-full p-2 rounded-xl text-center font-bold border border-emerald-100" value={editFood.fiber} onChange={e => setEditFood({...editFood, fiber: Number(e.target.value)})} />
+                                                    <button onClick={askAIFiber} disabled={loadingAI} className="bg-indigo-600 text-white p-2 rounded-xl">
+                                                        {loadingAI ? <i data-lucide="loader" className="w-4 h-4 animate-spin"></i> : <i data-lucide="wand-2" className="w-4 h-4"></i>}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Calculated Live Preview */}
+                                    <div className="text-center">
+                                        <p className="text-[10px] font-black uppercase text-slate-300">Adding to Log</p>
+                                        <div className="flex justify-center gap-4 text-xs font-bold text-slate-500 mt-1">
+                                            <span>{Math.round(editFood.carbs * (editFood.weight/100))}c</span>
+                                            <span>{Math.round(editFood.protein * (editFood.weight/100))}p</span>
+                                            <span>{Math.round(editFood.fat * (editFood.weight/100))}f</span>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => handleAddFood(editFood, editFood.weight)}
+                                        className="w-full bg-pink-500 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-pink-600 active:scale-95 transition-transform"
+                                    >
+                                        Add to Bowl 🥣
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {loadingAI && !modalOpen && (
+                        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center">
+                            <div className="bg-white p-6 rounded-3xl animate-bounce">
+                                <span className="text-4xl">🐱</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
