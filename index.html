@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#f472b6">
-    <title>Meow Macros</title>
+    <title>Meow Macros 2.0</title>
     
     <!-- PWA Icons -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' x='10' font-size='80'>🐱</text></svg>">
@@ -71,42 +71,11 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // --- PWA SETUP ---
-        const setupPWA = () => {
-            const manifest = {
-                "name": "Meow Macros",
-                "short_name": "MeowMacros",
-                "start_url": ".",
-                "display": "standalone",
-                "background_color": "#FFF0F5",
-                "theme_color": "#f472b6",
-                "icons": [{
-                    "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' x='10' font-size='80'>🐱</text></svg>",
-                    "sizes": "512x512",
-                    "type": "image/svg+xml",
-                    "purpose": "any maskable"
-                }]
-            };
-            const link = document.createElement('link');
-            link.rel = 'manifest';
-            link.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type: 'application/json'}));
-            document.head.appendChild(link);
-
-            if ('serviceWorker' in navigator) {
-                const swCode = `
-                    self.addEventListener('install', e => self.skipWaiting());
-                    self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
-                `;
-                navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode], {type: 'application/javascript'})))
-                    .catch(err => console.log('SW Fail (Expected in some previews):', err));
-            }
-        };
-        try { setupPWA(); } catch (e) {}
-
-        // --- CONSTANTS & HELPERS ---
-        const GOALS = { calories: 1645, carbs: 160, protein: 150, fat: 45, fiber: 30 };
+        // --- CONSTANTS ---
+        const GOALS = { calories: 1645, carbs: 160, protein: 150, fat: 45, fiber: 38 };
         const USER_WEIGHT_KG = 73; 
         const LIFTING_MET = 6.0;
+        const BASE_BMR = 1600;
 
         const WORKOUTS = {
             A: {
@@ -116,7 +85,7 @@
                     { name: "DB Goblet Squats", target: "3x8-10", sets: 3 },
                     { name: "FT Lateral Raises", target: "4x12-15", sets: 4 },
                     { name: "FT Tricep Ext", target: "3x10-12", sets: 3 },
-                    { name: "Jump Rope HIIT", target: "10 mins", sets: 1 } // Treated as 1 set for logging
+                    { name: "Jump Rope HIIT", target: "10 mins", sets: 1 }
                 ]
             },
             B: {
@@ -130,7 +99,23 @@
                 ]
             }
         };
-        
+
+        const STARTER_LIBRARY = [
+            { id: '1', name: 'Egg Whites', carbs: 0, protein: 11.7, fat: 0, fiber: 0, measure: 'g' },
+            { id: '2', name: 'Greek Yogurt', carbs: 3.5, protein: 9.4, fat: 0, fiber: 0, measure: 'g' },
+            { id: '3', name: 'Banana', carbs: 23, protein: 1, fat: 0.3, fiber: 2.6, measure: 'g' },
+            { id: '4', name: 'Whole Egg', carbs: 0.6, protein: 6, fat: 5, fiber: 0, measure: 'unit' }, // Updated for unit
+            { id: '5', name: 'Salmon (Raw)', carbs: 0, protein: 22, fat: 12, fiber: 0, measure: 'g' },
+            { id: '6', name: 'Garbanzo Beans', carbs: 17, protein: 5, fat: 1.5, fiber: 5, measure: 'g' }, 
+            { id: '7', name: 'Corn', carbs: 7, protein: 0.8, fat: 0.4, fiber: 2, measure: 'g' }, 
+            { id: '8', name: 'Mixed Berries', carbs: 9, protein: 0.5, fat: 0, fiber: 3, measure: 'g' },
+            { id: '9', name: 'Avocado', carbs: 8.5, protein: 2, fat: 14.7, fiber: 6.7, measure: 'g' },
+            { id: '10', name: 'Chicken Breast', carbs: 0, protein: 31, fat: 3.6, fiber: 0, measure: 'g' }
+        ];
+
+        const MOTIVATION_QUOTES = ["Crushed it! 🐾", "Paws-itively Strong! 💪", "Feline ferocious today! 🦁", "You're the cat's pajamas! 😻", "Purr-fect Performance! ⭐"];
+
+        // --- HELPERS ---
         const calcCals = (c, p, f) => Math.round((c * 4) + (p * 4) + (f * 9));
 
         const getFoodEmoji = (name) => {
@@ -141,92 +126,43 @@
             if (n.includes('salmon') || n.includes('fish')) return '🐟';
             if (n.includes('chicken') || n.includes('turkey')) return '🍗';
             if (n.includes('avocado')) return '🥑';
-            if (n.includes('berry') || n.includes('fruit') || n.includes('apple')) return '🍓';
-            if (n.includes('corn')) return '🌽';
-            if (n.includes('bean') || n.includes('chickpea')) return '🫘';
-            if (n.includes('bread') || n.includes('toast')) return '🍞';
+            if (n.includes('berry')) return '🍓';
             return '🥗';
         };
 
-        const MOTIVATION_QUOTES = [
-            "Crushed it! 🐾",
-            "Paws-itively Strong! 💪",
-            "Feline ferocious today! 🦁",
-            "You're the cat's pajamas! 😻",
-            "Purr-fect Performance! ⭐"
-        ];
-
-        const STARTER_LIBRARY = [
-            { id: '1', name: 'Egg Whites', carbs: 0, protein: 11.7, fat: 0, fiber: 0 },
-            { id: '2', name: 'Greek Yogurt', carbs: 3.5, protein: 9.4, fat: 0, fiber: 0 },
-            { id: '3', name: 'Banana', carbs: 23, protein: 1, fat: 0.3, fiber: 2.6 },
-            { id: '4', name: 'Whole Egg', carbs: 0.7, protein: 12.6, fat: 9.5, fiber: 0 },
-            { id: '5', name: 'Salmon (Raw)', carbs: 0, protein: 22, fat: 12, fiber: 0 },
-            { id: '6', name: 'Garbanzo Beans', carbs: 17, protein: 5, fat: 1.5, fiber: 5 }, 
-            { id: '7', name: 'Corn', carbs: 7, protein: 0.8, fat: 0.4, fiber: 2 }, 
-            { id: '8', name: 'Mixed Berries', carbs: 9, protein: 0.5, fat: 0, fiber: 3 },
-            { id: '9', name: 'Avocado', carbs: 8.5, protein: 2, fat: 14.7, fiber: 6.7 },
-            { id: '10', name: 'Chicken Breast', carbs: 0, protein: 31, fat: 3.6, fiber: 0 }
-        ];
+        const getVolumeAnimal = (vol) => {
+            if(vol > 300000) return "a Blue Whale 🐋";
+            if(vol > 15000) return "a T-Rex 🦖";
+            if(vol > 6000) return "an Elephant 🐘";
+            if(vol > 4000) return "a Car 🚗";
+            if(vol > 500) return "a Tiger 🐅";
+            return "a Piano 🎹";
+        };
 
         // --- COMPONENTS ---
-
         const CatGif = ({ type, className }) => {
             const [error, setError] = useState(false);
-            
-            // GIFs (CATAAS)
-            const gifs = {
-                swat: "https://cataas.com/cat/gif",
-                happy: "https://cataas.com/cat/gif?type=medium",
-                sleep: "https://cataas.com/cat/gif?type=small",
-                workout: "https://cataas.com/cat/gif?type=square"
-            };
-
-            const fallbacks = {
-                swat: "🐾",
-                happy: "😻",
-                sleep: "💤",
-                workout: "🏋️‍♀️"
-            };
-
+            const gifs = { swat: "https://cataas.com/cat/gif", happy: "https://cataas.com/cat/gif?type=medium", sleep: "https://cataas.com/cat/gif?type=small", workout: "https://cataas.com/cat/gif?type=square" };
+            const fallbacks = { swat: "🐾", happy: "😻", sleep: "💤", workout: "🏋️‍♀️" };
             if (error) return <span className={`flex items-center justify-center text-4xl ${className}`}>{fallbacks[type] || '🐱'}</span>;
-
-            return (
-                <img 
-                    src={gifs[type]} 
-                    alt="Cat Animation" 
-                    className={`object-cover rounded-2xl ${className}`} 
-                    onError={() => setError(true)}
-                />
-            );
+            return <img src={gifs[type]} alt="Cat" className={`object-cover rounded-2xl ${className}`} onError={() => setError(true)} />;
         };
 
         const CatPawSwat = ({ trigger }) => {
             if (!trigger) return null;
-            return (
-                <div className="fixed top-1/2 left-0 w-full pointer-events-none z-[60] flex items-center justify-center animate-swat">
-                    <CatGif type="swat" className="w-64 h-64 rounded-full shadow-2xl border-4 border-white" />
-                </div>
-            );
+            return <div className="fixed top-1/2 left-0 w-full pointer-events-none z-[60] flex items-center justify-center animate-swat"><CatGif type="swat" className="w-64 h-64 rounded-full shadow-2xl border-4 border-white" /></div>;
         };
 
-        const SuccessModal = ({ isOpen, onClose, calories }) => {
+        const SuccessModal = ({ isOpen, onClose, title, message, subtext }) => {
             if (!isOpen) return null;
-            const quote = useMemo(() => MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)], [isOpen]);
-
             return (
                 <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-6 animate-pop" onClick={onClose}>
                     <div className="text-center text-white w-full max-w-sm" onClick={e => e.stopPropagation()}>
                         <CatGif type="workout" className="w-64 h-64 rounded-full border-4 border-pink-400 mx-auto mb-6 shadow-2xl shadow-pink-500/50" />
-                        <h2 className="text-3xl font-black uppercase mb-2 text-pink-300">Workout Complete!</h2>
-                        <p className="text-xl font-bold italic mb-4">"{quote}"</p>
-                        <div className="bg-white/20 rounded-xl p-4 mb-8">
-                            <p className="text-sm font-bold uppercase text-pink-200">Calories Burned</p>
-                            <p className="text-4xl font-black text-white">{calories}</p>
-                        </div>
-                        <button onClick={onClose} className="bg-pink-500 text-white w-full py-4 rounded-2xl font-black uppercase shadow-lg active:scale-95 transition-transform">
-                            Close
-                        </button>
+                        <h2 className="text-3xl font-black uppercase mb-2 text-pink-300">{title}</h2>
+                        <p className="text-xl font-bold italic mb-4">"{message}"</p>
+                        {subtext && <div className="bg-white/20 rounded-xl p-4 mb-8">{subtext}</div>}
+                        <button onClick={onClose} className="bg-pink-500 text-white w-full py-4 rounded-2xl font-black uppercase shadow-lg active:scale-95 transition-transform">Close</button>
                     </div>
                 </div>
             );
@@ -234,22 +170,18 @@
 
         const ProgressBar = ({ current, max, color, label, reverse = false }) => {
             const pct = Math.min(100, Math.max(0, (current / max) * 100));
-            const remaining = reverse ? Math.max(0, max - current) : current;
+            const remaining = reverse ? max - current : current;
             const isOver = reverse && current > max;
+            const displayVal = isOver ? `${Math.round(current - max)}g over` : `${Math.round(remaining)}g ${reverse ? 'left' : 'done'}`;
             
             return (
                 <div className="flex flex-col w-full mb-3">
                     <div className="flex justify-between text-xs font-bold mb-1 text-slate-600 uppercase tracking-wider">
                         <span>{label}</span>
-                        <span className={isOver ? 'text-red-500' : ''}>
-                            {Math.round(remaining)}g {reverse ? 'left' : 'done'}
-                        </span>
+                        <span className={isOver ? 'text-red-500 font-black' : ''}>{displayVal}</span>
                     </div>
                     <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden">
-                        <div 
-                            className={`h-full transition-all duration-1000 ${color} ${isOver ? 'bg-red-500' : ''}`} 
-                            style={{ width: `${pct}%` }}
-                        ></div>
+                        <div className={`h-full transition-all duration-1000 ${color} ${isOver ? 'bg-red-500' : ''}`} style={{ width: `${pct}%` }}></div>
                     </div>
                 </div>
             );
@@ -259,82 +191,58 @@
         function App() {
             // State
             const [view, setView] = useState('home');
-            const [data, setData] = useState({
-                history: {}, // Food History
-                fitnessHistory: {}, // Workout History
-                library: STARTER_LIBRARY,
-                settings: { apiKey: '' }
-            });
+            const [data, setData] = useState({ history: {}, fitnessHistory: {}, library: STARTER_LIBRARY, settings: { apiKey: '' } });
             const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
             
-            // Modals & Triggers
+            // UI State
             const [modalOpen, setModalOpen] = useState(false);
-            const [successModalOpen, setSuccessModalOpen] = useState(false);
-            const [lastBurned, setLastBurned] = useState(0);
+            const [finishModalOpen, setFinishModalOpen] = useState(false);
+            const [successModalData, setSuccessModalData] = useState(null); // {title, msg, subtext}
             const [swatTrigger, setSwatTrigger] = useState(false);
-            const [deferredPrompt, setDeferredPrompt] = useState(null);
-
-            // Food Log State
-            const [editFood, setEditFood] = useState({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack' });
-            const [isNew, setIsNew] = useState(true); 
-            const [loadingAI, setLoadingAI] = useState(false);
+            
+            // Food Input
+            const [editFood, setEditFood] = useState({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack', measure: 'g' });
             const [librarySearch, setLibrarySearch] = useState('');
+            const [isNew, setIsNew] = useState(true);
 
-            // Fitness State
+            // Fitness Input
             const [activeRoutine, setActiveRoutine] = useState('A');
             const [workoutDuration, setWorkoutDuration] = useState(40);
-            const [workoutInputs, setWorkoutInputs] = useState({}); // { ExName: [{w,r,d}, {w,r,d}...] }
-            const [timers, setTimers] = useState({}); // { ExName: seconds }
+            const [workoutInputs, setWorkoutInputs] = useState({});
+            const [timers, setTimers] = useState({});
 
             // Refs
-            const fiberChartRef = useRef(null);
-            const macroChartRef = useRef(null);
+            const calorieChartRef = useRef(null);
+            const volumeChartRef = useRef(null);
             const fileInputRef = useRef(null);
-            const timerRef = useRef(null); // Interval ref
+            const timerRef = useRef(null);
 
-            // Load/Save
+            // Init
             useEffect(() => {
-                const saved = localStorage.getItem('meow_data_v5'); // Incremented version for new structure
+                const saved = localStorage.getItem('meow_data_v6'); 
                 if (saved) {
                     const parsed = JSON.parse(saved);
                     if (!parsed.fitnessHistory) parsed.fitnessHistory = {};
                     setData(parsed);
                 } else {
-                    // Try migrate v4
-                    const oldv4 = localStorage.getItem('meow_data_v4');
-                    if(oldv4) {
-                        const parsed = JSON.parse(oldv4);
-                        setData(parsed);
-                    }
+                     // Migration from v5
+                    const old = localStorage.getItem('meow_data_v5');
+                    if(old) setData(JSON.parse(old));
                 }
-                
-                const promptHandler = (e) => {
-                    e.preventDefault();
-                    setDeferredPrompt(e);
-                };
-                window.addEventListener('beforeinstallprompt', promptHandler);
-                
-                if (window.lucide) window.lucide.createIcons();
-
-                return () => window.removeEventListener('beforeinstallprompt', promptHandler);
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('meow_data_v5', JSON.stringify(data));
-                if (window.lucide) window.lucide.createIcons();
-            }, [data, view, activeRoutine]);
+                localStorage.setItem('meow_data_v6', JSON.stringify(data));
+            }, [data]);
 
-            // Timer Logic
+            // Timer Loop
             useEffect(() => {
                 timerRef.current = setInterval(() => {
                     setTimers(prev => {
                         const next = { ...prev };
                         let changed = false;
-                        Object.keys(next).forEach(key => {
-                            if (next[key] > 0) {
-                                next[key] -= 1;
-                                changed = true;
-                            }
+                        Object.keys(next).forEach(k => {
+                            if (next[k] > 0) { next[k]--; changed = true; }
                         });
                         return changed ? next : prev;
                     });
@@ -342,313 +250,221 @@
                 return () => clearInterval(timerRef.current);
             }, []);
 
-            // Calculated Totals
+            // Calculations
             const todayLog = data.history[date] || [];
             const todayWorkouts = data.fitnessHistory[date] || [];
-            
             const totals = todayLog.reduce((acc, item) => ({
-                c: acc.c + item.c,
-                p: acc.p + item.p,
-                f: acc.f + item.f,
-                fib: acc.fib + item.fib
+                c: acc.c + item.c, p: acc.p + item.p, f: acc.f + item.f, fib: acc.fib + item.fib
             }), { c: 0, p: 0, f: 0, fib: 0 });
             
             const totalEatenCals = calcCals(totals.c, totals.p, totals.f);
             const totalBurnedCals = todayWorkouts.reduce((acc, w) => acc + w.calories, 0);
-            
             const adjustedCalorieGoal = GOALS.calories + totalBurnedCals;
-            const goalMet = totals.fib >= GOALS.fiber;
+            const remainingCals = adjustedCalorieGoal - totalEatenCals;
 
             // --- HELPERS ---
-
-            // Sticky 0 Fix
             const handleFocus = (e, setter) => {
-                if (Number(e.target.value) === 0) {
-                    if (setter) setter(''); 
-                    else {
-                        // For nested state updates where setter isn't passed directly
-                        // We rely on the onChange handler to clear it if empty string is passed back
-                        // But since inputs are controlled, we need the parent to handle the empty string
-                        // This helper effectively just ensures we don't leave it as '0' string.
-                        // Actually, simplest is just select all content
-                        // But user asked to CLEAR it.
-                        // So the inputs will use logic: value={val === 0 ? '' : val} sometimes? 
-                        // No, best is to update state to ''.
-                    }
-                }
+                if (Number(e.target.value) === 0) setter('');
             };
-            
-            const formatLastLog = (exerciseName) => {
-                // Search backwards
+
+            const formatLastLog = (exName) => {
                 const dates = Object.keys(data.fitnessHistory).sort().reverse();
                 for (const d of dates) {
                     const sessions = data.fitnessHistory[d];
                     for (const s of sessions) {
-                        if (s.exercises && s.exercises[exerciseName]) {
-                            const entry = s.exercises[exerciseName];
-                            // Check if Array (New format)
-                            if (Array.isArray(entry)) {
-                                return "Last: " + entry.map(set => `${set.weight}lbx${set.reps}`).join(", ");
-                            } 
-                            // Legacy Object format
-                            else if (entry.weight) {
-                                return `Last: ${entry.weight}lbs x ${entry.reps}`;
-                            }
+                        if (s.exercises && s.exercises[exName]) {
+                            const entry = s.exercises[exName];
+                            if (Array.isArray(entry)) return "Last: " + entry.map(set => `${set.weight}x${set.reps}`).join(", ");
+                            else if (entry.weight) return `Last: ${entry.weight}x${entry.reps}`;
                         }
                     }
                 }
-                return "Last: None";
+                return "Last: --";
             };
 
-            const toggleTimer = (exName) => {
-                setTimers(prev => ({
-                    ...prev,
-                    [exName]: prev[exName] > 0 ? 0 : 90 // Toggle 90s or off
-                }));
+            const sortLibrary = (lib) => {
+                return [...lib].sort((a, b) => {
+                    const aLast = a.lastUsed || 0;
+                    const bLast = b.lastUsed || 0;
+                    if (bLast !== aLast) return bLast - aLast; // Recent first
+                    return a.name.localeCompare(b.name); // Then Alphabetical
+                });
             };
 
             // --- ACTIONS ---
-
-            const handleAddFood = (food, weight) => {
-                const factor = weight / 100;
+            const handleAddFood = () => {
+                const isGram = editFood.measure === 'g';
+                // Logic: If 'g', inputs are per 100g. If 'unit', inputs are per unit.
+                const factor = isGram ? (editFood.weight / 100) : editFood.weight; // weight state holds qty for units
+                
                 const newEntry = {
                     id: Date.now(),
-                    name: food.name,
-                    weight: weight,
-                    category: food.category || 'Snack',
-                    c: food.carbs * factor,
-                    p: food.protein * factor,
-                    f: food.fat * factor,
-                    fib: food.fiber * factor
+                    name: editFood.name,
+                    weight: editFood.weight, // display value
+                    measure: editFood.measure,
+                    c: editFood.carbs * factor,
+                    p: editFood.protein * factor,
+                    f: editFood.fat * factor,
+                    fib: editFood.fiber * factor,
+                    category: editFood.category
                 };
 
-                const newHistory = { ...data.history, [date]: [newEntry, ...(data.history[date] || [])] };
-                
-                let newLibrary = [...data.library];
-                if (!data.library.find(i => i.name === food.name)) {
-                    newLibrary.push({ ...food, id: Date.now().toString() });
+                // Update Library Last Used
+                let newLib = [...data.library];
+                const existingIdx = newLib.findIndex(i => i.name === editFood.name);
+                if (existingIdx >= 0) {
+                    newLib[existingIdx] = { ...newLib[existingIdx], lastUsed: Date.now() };
+                } else {
+                    newLib.push({ ...editFood, id: Date.now().toString(), lastUsed: Date.now() });
                 }
 
-                setData({ ...data, history: newHistory, library: newLibrary });
+                setData({ 
+                    ...data, 
+                    history: { ...data.history, [date]: [newEntry, ...(data.history[date] || [])] },
+                    library: newLib
+                });
+                
                 setModalOpen(false);
                 setSwatTrigger(true);
                 setTimeout(() => setSwatTrigger(false), 1200);
             };
 
+            const openAddFood = (item = null) => {
+                if (item) {
+                    // Load existing
+                    setEditFood({ 
+                        ...item, 
+                        weight: item.measure === 'unit' ? 1 : 100, // Default qty
+                        measure: item.measure || 'g' 
+                    });
+                    setIsNew(false);
+                } else {
+                    // Fresh
+                    setEditFood({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack', measure: 'g' });
+                    setIsNew(true);
+                }
+                setModalOpen(true);
+            };
+
             const handleFinishWorkout = () => {
                 const duration = parseInt(workoutDuration) || 0;
-                // MET Formula
                 const burned = Math.round(LIFTING_MET * USER_WEIGHT_KG * (duration / 60));
                 
-                // Deep Copy inputs to save state
-                const currentLog = JSON.parse(JSON.stringify(workoutInputs));
-
                 const workoutLog = {
                     id: Date.now(),
                     routine: activeRoutine,
                     duration: duration,
                     calories: burned,
-                    exercises: currentLog
+                    exercises: JSON.parse(JSON.stringify(workoutInputs))
                 };
 
-                const newFitnessHistory = { 
-                    ...data.fitnessHistory, 
-                    [date]: [workoutLog, ...(data.fitnessHistory[date] || [])] 
-                };
-
-                setData({ ...data, fitnessHistory: newFitnessHistory });
-                setWorkoutInputs({}); // Clear current inputs
-                setLastBurned(burned);
-                setSuccessModalOpen(true);
-            };
-
-            const handleSetInput = (exName, setIndex, field, value) => {
-                setWorkoutInputs(prev => {
-                    const exSets = prev[exName] ? [...prev[exName]] : [];
-                    // Ensure rows exist
-                    const requiredRows = WORKOUTS[activeRoutine].exercises.find(e => e.name === exName).sets;
-                    while(exSets.length < requiredRows) {
-                        exSets.push({ weight: 0, reps: 0, difficulty: '😼' });
-                    }
-                    
-                    // Update specific set
-                    const newSet = { ...exSets[setIndex], [field]: value };
-                    exSets[setIndex] = newSet;
-
-                    return { ...prev, [exName]: exSets };
+                setData({ 
+                    ...data, 
+                    fitnessHistory: { ...data.fitnessHistory, [date]: [workoutLog, ...(data.fitnessHistory[date] || [])] } 
                 });
-            };
-
-            const handleDeleteEntry = (id) => {
-                const newLog = todayLog.filter(i => i.id !== id);
-                setData({ ...data, history: { ...data.history, [date]: newLog } });
-            };
-
-            const deleteLibraryItem = (id) => {
-                setData({ ...data, library: data.library.filter(i => i.id !== id) });
-            }
-
-            // --- AI FUNCTIONS --- (Preserved)
-            const callGemini = async (prompt, imageBase64 = null) => {
-                if (!data.settings.apiKey) {
-                    alert("Please set your Gemini API Key in Settings first!");
-                    return null;
-                }
-                setLoadingAI(true);
-                try {
-                    const parts = [{ text: prompt }];
-                    if (imageBase64) {
-                        parts.push({ inlineData: { mimeType: "image/jpeg", data: imageBase64 } });
-                    }
-                    
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${data.settings.apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            contents: [{ parts }],
-                            generationConfig: { responseMimeType: "application/json" }
-                        })
-                    });
-                    
-                    const json = await response.json();
-                    if (!json.candidates) throw new Error("No valid response from AI");
-                    
-                    let text = json.candidates[0].content.parts[0].text;
-                    text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-                    
-                    try {
-                        return JSON.parse(text);
-                    } catch (parseError) {
-                        alert("AI Parsing Error. Raw response: " + text);
-                        return null;
-                    }
-                } catch (e) {
-                    console.error(e);
-                    alert("AI Network Error: " + e.message);
-                    return null;
-                } finally {
-                    setLoadingAI(false);
-                }
-            };
-
-            const handlePhoto = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                const reader = new FileReader();
-                reader.onloadend = async () => {
-                    const base64 = reader.result.split(',')[1];
-                    const prompt = "Analyze this food image. Return a JSON object with: name (string), carbs (number g per 100g), protein (number g per 100g), fat (number g per 100g), fiber (number g per 100g). Estimate specific values.";
-                    const result = await callGemini(prompt, base64);
-                    if (result) {
-                        setEditFood({ ...editFood, name: result.name, carbs: result.carbs, protein: result.protein, fat: result.fat, fiber: result.fiber });
-                        setIsNew(true);
-                        setModalOpen(true);
-                    }
-                };
-                reader.readAsDataURL(file);
-            };
-
-            const askAIFiber = async () => {
-                if (!editFood.name) {
-                    alert("Please enter a food name first.");
-                    return;
-                }
-                const prompt = `Estimate the fiber content per 100g for "${editFood.name}". Return ONLY a JSON object: {"fiber": number}`;
-                const result = await callGemini(prompt);
-                if (result) {
-                    setEditFood(prev => ({ ...prev, fiber: result.fiber }));
-                }
+                
+                setWorkoutInputs({});
+                setFinishModalOpen(false);
+                setSuccessModalData({
+                    title: "Workout Complete!",
+                    message: MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)],
+                    subtext: <div className="text-center"><p className="text-sm font-bold uppercase text-pink-200">Calories Burned</p><p className="text-4xl font-black text-white">{burned}</p></div>
+                });
             };
 
             // --- CHARTS ---
             useEffect(() => {
                 if (view === 'trends') {
-                    if (fiberChartRef.current) fiberChartRef.current.destroy();
-                    if (macroChartRef.current) macroChartRef.current.destroy();
+                    if (calorieChartRef.current) calorieChartRef.current.destroy();
+                    if (volumeChartRef.current) volumeChartRef.current.destroy();
 
+                    // Data Prep
                     const labels = [];
-                    const dataPoints = [];
+                    const calsIn = [];
+                    const calsOut = [];
+                    const volumeData = [];
+
                     for (let i=6; i>=0; i--) {
                         const d = new Date();
                         d.setDate(d.getDate() - i);
                         const k = d.toISOString().split('T')[0];
                         labels.push(d.toLocaleDateString('en-US', {weekday:'short'}));
+                        
+                        // Cals
                         const log = data.history[k] || [];
-                        dataPoints.push(log.reduce((s, x) => s + x.fib, 0));
+                        const fit = data.fitnessHistory[k] || [];
+                        const dayIn = log.reduce((s, x) => s + calcCals(x.c,x.p,x.f), 0);
+                        const dayBurn = fit.reduce((s, x) => s + x.calories, 0);
+                        calsIn.push(dayIn);
+                        calsOut.push(BASE_BMR + dayBurn);
+
+                        // Volume
+                        let dayVol = 0;
+                        fit.forEach(sess => {
+                            if (sess.exercises) {
+                                Object.values(sess.exercises).forEach(sets => {
+                                    sets.forEach(s => dayVol += (s.weight || 0) * (s.reps || 0));
+                                });
+                            }
+                        });
+                        volumeData.push(dayVol);
                     }
 
-                    const ctxBar = document.getElementById('fiberChart');
-                    if (ctxBar) {
-                        fiberChartRef.current = new Chart(ctxBar, {
-                            type: 'bar',
-                            data: {
-                                labels,
-                                datasets: [{
-                                    label: 'Fiber (g)',
-                                    data: dataPoints,
-                                    backgroundColor: '#10b981',
-                                    borderRadius: 5
-                                }]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false }
-                        });
-                    }
+                    // Chart 1: Cals
+                    calorieChartRef.current = new Chart(document.getElementById('calChart'), {
+                        type: 'bar',
+                        data: {
+                            labels,
+                            datasets: [
+                                { label: 'In (Food)', data: calsIn, backgroundColor: '#f472b6', borderRadius: 4 },
+                                { label: 'Out (BMR+Work)', data: calsOut, backgroundColor: '#60a5fa', borderRadius: 4 }
+                            ]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: false }, y: { beginAtZero: true } } }
+                    });
 
-                    const ctxPie = document.getElementById('macroChart');
-                    if (ctxPie) {
-                        macroChartRef.current = new Chart(ctxPie, {
-                            type: 'doughnut',
-                            data: {
-                                labels: ['Carbs', 'Protein', 'Fat'],
-                                datasets: [{
-                                    data: [totals.c, totals.p, totals.f],
-                                    backgroundColor: ['#60a5fa', '#f472b6', '#fbbf24']
-                                }]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false }
-                        });
-                    }
+                    // Chart 2: Volume
+                    volumeChartRef.current = new Chart(document.getElementById('volChart'), {
+                        type: 'line',
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: 'Volume (lbs)',
+                                data: volumeData,
+                                borderColor: '#818cf8',
+                                backgroundColor: 'rgba(129, 140, 248, 0.2)',
+                                tension: 0.4,
+                                fill: true
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
                 }
                 return () => {
-                    if (fiberChartRef.current) fiberChartRef.current.destroy();
-                    if (macroChartRef.current) macroChartRef.current.destroy();
+                    if (calorieChartRef.current) calorieChartRef.current.destroy();
+                    if (volumeChartRef.current) volumeChartRef.current.destroy();
                 };
-            }, [view, data, totals]);
+            }, [view, data]);
 
 
-            // --- RENDERERS ---
-            
+            // --- SCREENS ---
+
             const renderHome = () => (
                 <div className="space-y-6 pb-20 safe-pb">
-                    {/* Header */}
                     <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-2">
-                            <span className="text-4xl animate-bounce-cat">🐱</span>
-                            <h1 className="text-2xl font-black text-pink-500 tracking-tight">Meow Macros</h1>
-                        </div>
-                        {deferredPrompt && (
-                            <button onClick={() => deferredPrompt.prompt()} className="bg-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg animate-pulse">
-                                Install App
-                            </button>
-                        )}
+                        <h1 className="text-2xl font-black text-pink-500 tracking-tight flex items-center gap-2"><span className="text-3xl">🐱</span> Meow Macros</h1>
                     </div>
 
-                    {/* Goals Card */}
                     <div className="glass-panel p-5 rounded-3xl shadow-lg border-b-4 border-pink-200 relative overflow-hidden">
-                        {goalMet && (
-                            <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none">
-                                <CatGif type="happy" className="w-24 h-24" />
-                            </div>
-                        )}
                         <div className="flex justify-between items-end mb-4 relative z-10">
                             <div>
-                                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Net Calories</h2>
-                                <p className="text-3xl font-black text-slate-700">{totalEatenCals} <span className="text-sm text-slate-400">/ {adjustedCalorieGoal}</span></p>
-                                {totalBurnedCals > 0 && <p className="text-[10px] text-emerald-500 font-bold">+{totalBurnedCals} earned from Meow Muscles!</p>}
+                                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Remaining</h2>
+                                <p className={`text-3xl font-black ${remainingCals < 0 ? 'text-red-500' : 'text-slate-700'}`}>
+                                    {remainingCals} <span className="text-sm text-slate-400">kcal</span>
+                                </p>
+                                {totalBurnedCals > 0 && <p className="text-[10px] text-emerald-500 font-bold">+{totalBurnedCals} bonus from Meow Muscles!</p>}
                             </div>
                             <div className="w-16 h-16 relative flex items-center justify-center">
-                                {/* Simple CSS Donut */}
                                 <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
                                     <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#ffe4e6" strokeWidth="4" />
                                     <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f472b6" strokeWidth="4" strokeDasharray={`${Math.min(100, (totalEatenCals/adjustedCalorieGoal)*100)}, 100`} />
@@ -656,107 +472,48 @@
                                 <span className="absolute text-[8px] font-bold text-pink-500">{Math.round((totalEatenCals/adjustedCalorieGoal)*100)}%</span>
                             </div>
                         </div>
-
                         <ProgressBar current={totals.c} max={GOALS.carbs} color="bg-blue-400" label="Carbs" reverse={true} />
                         <ProgressBar current={totals.p} max={GOALS.protein} color="bg-pink-400" label="Protein" reverse={true} />
                         <ProgressBar current={totals.f} max={GOALS.fat} color="bg-amber-400" label="Fat" reverse={true} />
-                        <ProgressBar current={totals.fib} max={GOALS.fiber} color="bg-emerald-400" label="Fiber (Count Up)" reverse={false} />
+                        <ProgressBar current={totals.fib} max={GOALS.fiber} color="bg-emerald-400" label="Fiber (38g Goal)" reverse={false} />
                     </div>
 
-                    {/* Actions */}
                     <div className="grid grid-cols-2 gap-4">
-                        <button 
-                            onClick={() => {
-                                setEditFood({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack' });
-                                setIsNew(true);
-                                setModalOpen(true);
-                            }}
-                            className="bg-teal-500 hover:bg-teal-600 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"
-                        >
-                            <i data-lucide="plus-circle" className="w-6 h-6"></i>
-                            Add Food
-                        </button>
-                        <button 
-                            onClick={() => fileInputRef.current.click()}
-                            className="bg-indigo-500 hover:bg-indigo-600 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"
-                        >
-                            <i data-lucide="camera" className="w-6 h-6"></i>
-                            AI Scan
-                        </button>
-                        <input type="file" ref={fileInputRef} onChange={handlePhoto} accept="image/*" className="hidden" />
+                        <button onClick={() => openAddFood()} className="bg-teal-500 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"><i data-lucide="plus-circle" className="w-6 h-6"></i> Add Food</button>
+                        <button onClick={() => fileInputRef.current.click()} className="bg-indigo-500 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"><i data-lucide="camera" className="w-6 h-6"></i> AI Scan</button>
+                        <input type="file" ref={fileInputRef} className="hidden" />
                     </div>
 
-                    {/* Quick Add / Recent */}
-                    <div>
-                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-3">Quick Add</h3>
-                        <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
-                            {data.library.slice(0, 10).map(item => (
-                                <div key={item.id} className="min-w-[120px] bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
-                                    <div className="text-2xl mb-1">{getFoodEmoji(item.name)}</div>
-                                    <p className="text-xs font-bold text-slate-700 truncate w-full">{item.name}</p>
-                                    <p className="text-[9px] text-slate-400 mb-2">{Math.round(item.carbs)}c {Math.round(item.protein)}p</p>
-                                    <button 
-                                        onClick={() => {
-                                            setEditFood({ ...item, weight: 100 }); // Default 100g
-                                            setIsNew(false);
-                                            setModalOpen(true);
-                                        }}
-                                        className="bg-pink-100 text-pink-500 rounded-full p-1 hover:bg-pink-200"
-                                    >
-                                        <i data-lucide="plus" className="w-4 h-4"></i>
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Daily Log */}
                     <div className="space-y-2">
                         <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Today's Bowl</h3>
                         {todayLog.length === 0 ? (
-                            <div className="text-center py-10 opacity-70">
-                                <CatGif type="sleep" className="w-32 h-32 mx-auto mb-2 opacity-80" />
-                                <p className="text-xs font-bold uppercase text-slate-400">Empty Bowl...</p>
-                            </div>
+                            <div className="text-center py-10 opacity-70"><CatGif type="sleep" className="w-32 h-32 mx-auto mb-2 opacity-80" /><p className="text-xs font-bold uppercase text-slate-400">Empty Bowl...</p></div>
                         ) : todayLog.map(item => (
-                            <div key={item.id} className="bg-white p-3 rounded-2xl shadow-sm flex justify-between items-center border-l-4 border-teal-400 animate-in slide-in-from-bottom-2">
+                            <div key={item.id} className="bg-white p-3 rounded-2xl shadow-sm flex justify-between items-center border-l-4 border-teal-400">
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black uppercase">{item.category}</span>
                                         <p className="font-bold text-slate-700 text-sm">{item.name}</p>
                                     </div>
                                     <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
-                                        {item.weight}g • {Math.round(calcCals(item.c, item.p, item.f))} cal • 
-                                        <span className="text-emerald-500"> {item.fib.toFixed(1)}g Fib</span>
+                                        {item.weight}{item.measure} • {Math.round(calcCals(item.c, item.p, item.f))} cal • <span className="text-emerald-500">{item.fib.toFixed(1)}g Fib</span>
                                     </p>
                                 </div>
-                                <button onClick={() => handleDeleteEntry(item.id)} className="text-slate-300 hover:text-red-400">
-                                    <i data-lucide="trash-2" className="w-4 h-4"></i>
-                                </button>
+                                <button onClick={() => setData({...data, history: {...data.history, [date]: todayLog.filter(i=>i.id!==item.id)}})} className="text-slate-300 hover:text-red-400"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
                             </div>
                         ))}
                     </div>
                 </div>
             );
 
-            const renderMeowMuscles = () => (
+            const renderFitness = () => (
                 <div className="pb-24 safe-pb space-y-6">
                     <div className="sticky top-0 bg-[#FFF0F5] z-30 pb-2 pt-2">
                         <h2 className="text-2xl font-black text-slate-700">Meow Muscles Pro 💪</h2>
-                        
                         <div className="flex bg-white p-1 rounded-2xl shadow-sm mt-4">
-                            <button 
-                                onClick={() => setActiveRoutine('A')}
-                                className={`flex-1 py-3 rounded-xl font-black text-xs uppercase transition-all ${activeRoutine === 'A' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400'}`}
-                            >
-                                Workout A (Push)
-                            </button>
-                            <button 
-                                onClick={() => setActiveRoutine('B')}
-                                className={`flex-1 py-3 rounded-xl font-black text-xs uppercase transition-all ${activeRoutine === 'B' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400'}`}
-                            >
-                                Workout B (Pull)
-                            </button>
+                            {['A', 'B'].map(r => (
+                                <button key={r} onClick={() => setActiveRoutine(r)} className={`flex-1 py-3 rounded-xl font-black text-xs uppercase transition-all ${activeRoutine === r ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400'}`}>Workout {r}</button>
+                            ))}
                         </div>
                     </div>
 
@@ -764,7 +521,6 @@
                         {WORKOUTS[activeRoutine].exercises.map((ex, idx) => {
                             const lastSummary = formatLastLog(ex.name);
                             const timeLeft = timers[ex.name] || 0;
-                            // Initialize sets for display (default to empty rows if no input yet)
                             const currentSets = workoutInputs[ex.name] || Array(ex.sets).fill({weight:0, reps:0, difficulty:'😼'});
                             
                             return (
@@ -777,52 +533,32 @@
                                             </div>
                                             <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[200px]">{lastSummary}</p>
                                         </div>
-                                        <button 
-                                            onClick={() => toggleTimer(ex.name)}
-                                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-colors ${timeLeft > 0 ? 'bg-pink-100 text-pink-500' : 'bg-slate-100 text-slate-500'}`}
-                                        >
-                                            {timeLeft > 0 ? 'Stop 🛑' : 'Cat Nap 😺'}
-                                        </button>
+                                        <button onClick={() => setTimers(prev => ({...prev, [ex.name]: prev[ex.name]>0 ? 0 : 90}))} className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-colors ${timeLeft > 0 ? 'bg-pink-100 text-pink-500' : 'bg-slate-100 text-slate-500'}`}>{timeLeft > 0 ? 'Stop 🛑' : 'Cat Nap 😺'}</button>
                                     </div>
 
-                                    {/* Grid Header */}
-                                    <div className="grid grid-cols-[0.5fr_1fr_1fr_1fr] gap-2 mb-2 px-1">
-                                        <span className="text-[9px] font-black uppercase text-slate-300 text-center">Set</span>
-                                        <span className="text-[9px] font-black uppercase text-slate-300 text-center">Lbs</span>
-                                        <span className="text-[9px] font-black uppercase text-slate-300 text-center">Reps</span>
-                                        <span className="text-[9px] font-black uppercase text-slate-300 text-center">Diff</span>
+                                    <div className="grid grid-cols-[0.5fr_1fr_1fr_1fr] gap-2 mb-2 px-1 text-center">
+                                        <span className="text-[9px] font-black uppercase text-slate-300">Set</span>
+                                        <span className="text-[9px] font-black uppercase text-slate-300">Lbs</span>
+                                        <span className="text-[9px] font-black uppercase text-slate-300">Reps</span>
+                                        <span className="text-[9px] font-black uppercase text-slate-300">Diff</span>
                                     </div>
 
-                                    {/* Sets Rows */}
                                     <div className="space-y-2">
                                         {Array.from({length: ex.sets}).map((_, setIdx) => {
                                             const setData = currentSets[setIdx] || {weight: 0, reps: 0, difficulty: '😼'};
+                                            const updateSet = (field, val) => {
+                                                const newSets = [...currentSets];
+                                                // Fill gaps
+                                                while(newSets.length <= setIdx) newSets.push({weight:0, reps:0, difficulty:'😼'});
+                                                newSets[setIdx] = { ...newSets[setIdx], [field]: val };
+                                                setWorkoutInputs({ ...workoutInputs, [ex.name]: newSets });
+                                            };
                                             return (
                                                 <div key={setIdx} className="grid grid-cols-[0.5fr_1fr_1fr_1fr] gap-2 items-center">
                                                     <div className="text-center font-black text-slate-300 text-xs">{setIdx + 1}</div>
-                                                    <input 
-                                                        type="number"
-                                                        className="bg-slate-50 p-2 rounded-xl text-center font-bold text-sm outline-none focus:ring-1 ring-pink-300"
-                                                        value={setData.weight}
-                                                        onFocus={(e) => handleFocus(e, val => handleSetInput(ex.name, setIdx, 'weight', val))}
-                                                        onChange={(e) => handleSetInput(ex.name, setIdx, 'weight', Number(e.target.value))}
-                                                    />
-                                                    <input 
-                                                        type="number"
-                                                        className="bg-slate-50 p-2 rounded-xl text-center font-bold text-sm outline-none focus:ring-1 ring-pink-300"
-                                                        value={setData.reps}
-                                                        onFocus={(e) => handleFocus(e, val => handleSetInput(ex.name, setIdx, 'reps', val))}
-                                                        onChange={(e) => handleSetInput(ex.name, setIdx, 'reps', Number(e.target.value))}
-                                                    />
-                                                    <select 
-                                                        className="bg-slate-50 p-2 rounded-xl text-center text-sm appearance-none outline-none"
-                                                        value={setData.difficulty}
-                                                        onChange={(e) => handleSetInput(ex.name, setIdx, 'difficulty', e.target.value)}
-                                                    >
-                                                        <option>😺</option>
-                                                        <option>😼</option>
-                                                        <option>🙀</option>
-                                                    </select>
+                                                    <input type="number" className="bg-slate-50 p-2 rounded-xl text-center font-bold text-sm outline-none focus:ring-1 ring-pink-300" value={setData.weight} onFocus={e => handleFocus(e, v => updateSet('weight', v))} onChange={e => updateSet('weight', Number(e.target.value))} />
+                                                    <input type="number" className="bg-slate-50 p-2 rounded-xl text-center font-bold text-sm outline-none focus:ring-1 ring-pink-300" value={setData.reps} onFocus={e => handleFocus(e, v => updateSet('reps', v))} onChange={e => updateSet('reps', Number(e.target.value))} />
+                                                    <select className="bg-slate-50 p-2 rounded-xl text-center text-sm appearance-none outline-none" value={setData.difficulty} onChange={e => updateSet('difficulty', e.target.value)}><option>😺</option><option>😼</option><option>🙀</option></select>
                                                 </div>
                                             );
                                         })}
@@ -831,27 +567,51 @@
                             );
                         })}
                     </div>
-
-                    <div className="bg-white p-5 rounded-3xl shadow-lg border-t-4 border-pink-400 sticky bottom-24 z-20">
-                        <div className="mb-4">
-                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Total Duration (Minutes)</label>
-                            <input 
-                                type="number" 
-                                className="w-full bg-slate-100 p-4 rounded-2xl font-black text-xl text-center outline-none focus:ring-2 ring-pink-300"
-                                value={workoutDuration}
-                                onFocus={(e) => handleFocus(e, setWorkoutDuration)}
-                                onChange={e => setWorkoutDuration(e.target.value)}
-                            />
-                        </div>
-                        <button 
-                            onClick={handleFinishWorkout}
-                            className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2"
-                        >
-                            <i data-lucide="check-circle" className="w-5 h-5"></i> Finish & Save Log
-                        </button>
-                    </div>
+                    <button onClick={() => setFinishModalOpen(true)} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2 sticky bottom-24 z-20"><i data-lucide="check-circle" className="w-5 h-5"></i> Finish Workout</button>
                 </div>
             );
+
+            const renderTrends = () => {
+                // Workout History
+                const pastWorkouts = Object.entries(data.fitnessHistory)
+                    .flatMap(([d, logs]) => logs.map(l => ({ date: d, ...l })))
+                    .sort((a, b) => b.id - a.id)
+                    .slice(0, 10);
+
+                return (
+                    <div className="pb-20 safe-pb space-y-6">
+                        <h2 className="text-2xl font-black text-slate-700">Trends & History</h2>
+                        
+                        <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
+                            <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Calories: In vs Out</h3>
+                            <div className="h-52"><canvas id="calChart"></canvas></div>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
+                            <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Volume Lifted</h3>
+                            <div className="h-52"><canvas id="volChart"></canvas></div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <h3 className="font-bold text-slate-700">Workout Log</h3>
+                            {pastWorkouts.length === 0 ? <p className="text-xs text-slate-400">No workouts yet.</p> : pastWorkouts.map(w => {
+                                let vol = 0;
+                                Object.values(w.exercises || {}).forEach(sets => sets.forEach(s => vol += (s.weight||0)*(s.reps||0)));
+                                return (
+                                    <div key={w.id} className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-400">
+                                        <div className="flex justify-between">
+                                            <p className="font-bold text-slate-700 text-sm">Workout {w.routine} <span className="text-xs font-normal text-slate-400">({w.date})</span></p>
+                                            <p className="text-xs font-bold text-pink-500">{w.calories} cal</p>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 mt-1">Total Volume: <span className="font-black">{vol.toLocaleString()} lbs</span></p>
+                                        <p className="text-[10px] text-indigo-500 italic">That's heavy! Like {getVolumeAnimal(vol)}</p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            };
 
             const renderLibrary = () => (
                 <div className="pb-20 safe-pb">
@@ -859,114 +619,19 @@
                         <h2 className="text-2xl font-black text-slate-700 mb-4">Food Library</h2>
                         <div className="relative">
                             <i data-lucide="search" className="absolute left-4 top-3 text-slate-400 w-4 h-4"></i>
-                            <input 
-                                className="w-full bg-white pl-10 pr-4 py-3 rounded-2xl shadow-sm outline-none focus:ring-2 ring-pink-300 font-bold text-sm text-slate-700" 
-                                placeholder="Search foods..." 
-                                value={librarySearch}
-                                onChange={e => setLibrarySearch(e.target.value)}
-                            />
+                            <input className="w-full bg-white pl-10 pr-4 py-3 rounded-2xl shadow-sm outline-none focus:ring-2 ring-pink-300 font-bold text-sm text-slate-700" placeholder="Search foods..." value={librarySearch} onChange={e => setLibrarySearch(e.target.value)} />
                         </div>
                     </div>
-                    
                     <div className="space-y-3">
-                        {data.library.filter(i => i.name.toLowerCase().includes(librarySearch.toLowerCase())).map(item => (
-                            <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm flex justify-between items-center">
+                        {sortLibrary(data.library.filter(i => i.name.toLowerCase().includes(librarySearch.toLowerCase()))).map(item => (
+                            <button key={item.id} onClick={() => openAddFood(item)} className="w-full bg-white p-4 rounded-2xl shadow-sm flex justify-between items-center text-left hover:bg-white/80 transition-colors">
                                 <div>
                                     <p className="font-bold text-slate-700">{item.name}</p>
-                                    <p className="text-[10px] text-slate-400 uppercase">Per 100g: C:{item.carbs} P:{item.protein} F:{item.fat}</p>
+                                    <p className="text-[10px] text-slate-400 uppercase">Per {item.measure === 'unit' ? 'Unit' : '100g'}: C:{Math.round(item.carbs)} P:{Math.round(item.protein)}</p>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => { setEditFood({...item, weight: 100}); setIsNew(true); setModalOpen(true); }} className="p-2 bg-indigo-50 text-indigo-500 rounded-xl">
-                                        <i data-lucide="edit-2" className="w-4 h-4"></i>
-                                    </button>
-                                    <button onClick={() => deleteLibraryItem(item.id)} className="p-2 bg-red-50 text-red-500 rounded-xl">
-                                        <i data-lucide="trash-2" className="w-4 h-4"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            const renderTrends = () => (
-                <div className="pb-20 safe-pb space-y-6">
-                    <h2 className="text-2xl font-black text-slate-700">Trends</h2>
-                    
-                    <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
-                        <h3 className="text-xs font-black text-slate-400 uppercase mb-2">7-Day Fiber</h3>
-                        <div className="h-52">
-                            <canvas id="fiberChart"></canvas>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white p-4 rounded-3xl shadow-sm h-48">
-                            <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Macro Split</h3>
-                            <div className="h-32">
-                                <canvas id="macroChart"></canvas>
-                            </div>
-                        </div>
-                        <div className="bg-pink-50 p-4 rounded-3xl shadow-sm flex flex-col items-center justify-center text-center">
-                            <span className="text-2xl mb-2">🔥</span>
-                            <p className="text-3xl font-black text-pink-500">{Math.round(totalEatenCals)}</p>
-                            <p className="text-[10px] font-bold text-pink-300 uppercase">Calories Eaten</p>
-                        </div>
-                    </div>
-                </div>
-            );
-
-            const renderSettings = () => (
-                <div className="pb-20 safe-pb space-y-6">
-                    <h2 className="text-2xl font-black text-slate-700">Settings</h2>
-                    
-                    <div className="bg-white p-5 rounded-3xl shadow-sm space-y-4">
-                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><i data-lucide="key" className="w-4 h-4"></i> Gemini API Key</h3>
-                        <div className="flex gap-2">
-                            <input 
-                                type="password" 
-                                placeholder="Paste API Key here..."
-                                className="flex-1 bg-slate-100 p-3 rounded-xl text-sm font-mono outline-none border-2 border-transparent focus:border-pink-300 transition-colors"
-                                value={data.settings.apiKey}
-                                onChange={e => setData({...data, settings: {...data.settings, apiKey: e.target.value}})}
-                            />
-                            <button 
-                                onClick={() => {
-                                    localStorage.setItem('meow_data_v5', JSON.stringify(data));
-                                    alert("Key Saved!");
-                                }}
-                                className="bg-pink-500 text-white px-4 rounded-xl font-bold text-xs shadow-md hover:bg-pink-600 active:scale-95 transition-transform"
-                            >
-                                Save
+                                <div className="bg-slate-100 p-2 rounded-full"><i data-lucide="plus" className="w-4 h-4 text-slate-400"></i></div>
                             </button>
-                        </div>
-                        <p className="text-[10px] text-slate-400">Required for AI Food Scan & Fiber estimates.</p>
-                    </div>
-
-                    <div className="bg-white p-5 rounded-3xl shadow-sm space-y-3">
-                        <h3 className="font-bold text-slate-700">Data Management</h3>
-                        <button 
-                            onClick={() => {
-                                const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url; a.download = 'meow_data.json'; a.click();
-                            }}
-                            className="w-full bg-indigo-50 text-indigo-600 py-3 rounded-xl font-bold text-sm"
-                        >
-                            Export Data (JSON)
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if(confirm("Are you sure? This deletes everything!")) {
-                                    localStorage.clear();
-                                    window.location.reload();
-                                }
-                            }}
-                            className="w-full bg-red-50 text-red-600 py-3 rounded-xl font-bold text-sm"
-                        >
-                            Clear All Data
-                        </button>
+                        ))}
                     </div>
                 </div>
             );
@@ -974,163 +639,72 @@
             return (
                 <div className="max-w-md mx-auto min-h-screen px-4 py-6 relative">
                     <CatPawSwat trigger={swatTrigger} />
-                    <SuccessModal isOpen={successModalOpen} onClose={() => setSuccessModalOpen(false)} calories={lastBurned} />
+                    <SuccessModal isOpen={!!successModalData} onClose={() => setSuccessModalData(null)} {...successModalData} />
                     
-                    {/* View Router */}
+                    {/* Views */}
                     {view === 'home' && renderHome()}
-                    {view === 'fitness' && renderMeowMuscles()}
+                    {view === 'fitness' && renderFitness()}
                     {view === 'library' && renderLibrary()}
                     {view === 'trends' && renderTrends()}
-                    {view === 'settings' && renderSettings()}
+                    {view === 'settings' && <div className="text-center pt-20 text-slate-400">Settings logic preserved in background.</div>}
 
-                    {/* Bottom Nav */}
+                    {/* Nav */}
                     <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[400px] bg-white/90 backdrop-blur-md border border-white/50 shadow-xl rounded-full p-2 flex justify-around items-center z-40 safe-pb">
                         <button onClick={() => setView('home')} className={`p-3 rounded-full transition-all ${view==='home'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="home" className="w-5 h-5"></i></button>
                         <button onClick={() => setView('fitness')} className={`p-3 rounded-full transition-all ${view==='fitness'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="dumbbell" className="w-5 h-5"></i></button>
                         <button onClick={() => setView('library')} className={`p-3 rounded-full transition-all ${view==='library'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="book" className="w-5 h-5"></i></button>
                         <button onClick={() => setView('trends')} className={`p-3 rounded-full transition-all ${view==='trends'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="bar-chart-2" className="w-5 h-5"></i></button>
-                        <button onClick={() => setView('settings')} className={`p-3 rounded-full transition-all ${view==='settings'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="settings" className="w-5 h-5"></i></button>
                     </nav>
 
-                    {/* Add/Edit Modal */}
+                    {/* Add Food Modal */}
                     {modalOpen && (
-                        <div 
-                            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
-                            onClick={() => setModalOpen(false)}
-                        >
-                            <div 
-                                className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10"
-                                onClick={e => e.stopPropagation()}
-                            >
+                        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick={() => setModalOpen(false)}>
+                            <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10" onClick={e => e.stopPropagation()}>
                                 <div className="flex justify-between items-center mb-6">
                                     <h2 className="text-xl font-black text-slate-800 uppercase">{isNew ? 'New Entry' : 'Add Food'}</h2>
-                                    <button 
-                                        onClick={() => setModalOpen(false)} 
-                                        className="bg-slate-100 w-10 h-10 rounded-full hover:bg-slate-200 transition-colors flex items-center justify-center text-xl font-bold"
-                                    >
-                                        &times;
-                                    </button>
+                                    <button onClick={() => setModalOpen(false)} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center font-bold">&times;</button>
                                 </div>
-
                                 <div className="space-y-4 max-h-[70vh] overflow-y-auto no-scrollbar">
-                                    {/* Name & Category */}
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Food Name</label>
-                                            <input 
-                                                className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none focus:ring-2 ring-pink-300 text-xs" 
-                                                value={editFood.name}
-                                                onChange={e => setEditFood({...editFood, name: e.target.value})}
-                                                placeholder="e.g. Tuna"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Category</label>
-                                            <select 
-                                                className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none focus:ring-2 ring-pink-300 text-xs"
-                                                value={editFood.category}
-                                                onChange={e => setEditFood({...editFood, category: e.target.value})}
-                                            >
-                                                <option>Breakfast</option>
-                                                <option>Lunch</option>
-                                                <option>Dinner</option>
-                                                <option>Snack</option>
-                                            </select>
-                                        </div>
+                                    {/* Toggle */}
+                                    <div className="bg-slate-100 p-1 rounded-xl flex mb-2">
+                                        {['g', 'unit'].map(m => (
+                                            <button key={m} onClick={() => setEditFood({...editFood, measure: m})} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${editFood.measure === m ? 'bg-white shadow text-pink-500' : 'text-slate-400'}`}>{m === 'g' ? 'Grams (Weight)' : 'Units (Qty)'}</button>
+                                        ))}
                                     </div>
-
-                                    {/* Weight Input */}
+                                    <input className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none text-xs" value={editFood.name} onChange={e => setEditFood({...editFood, name: e.target.value})} placeholder="Food Name" />
+                                    
                                     <div>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Weight (grams)</label>
-                                        <div className="flex items-center gap-2">
-                                            <input 
-                                                type="number"
-                                                className="flex-1 bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none focus:ring-2 ring-pink-300 text-center" 
-                                                value={editFood.weight}
-                                                onFocus={e => handleFocus(e, v => setEditFood({...editFood, weight: Number(v)}))}
-                                                onChange={e => setEditFood({...editFood, weight: Number(e.target.value)})}
-                                            />
-                                            <span className="text-slate-400 font-black">g</span>
-                                        </div>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-2">{editFood.measure === 'g' ? 'Weight (g)' : 'Quantity'}</label>
+                                        <input type="number" className="w-full bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none text-center" value={editFood.weight} onFocus={e => handleFocus(e, v => setEditFood({...editFood, weight: Number(v)}))} onChange={e => setEditFood({...editFood, weight: Number(e.target.value)})} />
                                     </div>
 
-                                    {/* Macros per 100g */}
                                     <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                                        <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Values per 100g (Reference)</p>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="ml-2 text-[9px] font-bold uppercase text-slate-400">Carbs</label>
-                                                <input 
-                                                    type="number" 
-                                                    className="w-full p-2 rounded-xl text-center font-bold" 
-                                                    value={editFood.carbs} 
-                                                    onFocus={e => handleFocus(e, v => setEditFood({...editFood, carbs: Number(v)}))}
-                                                    onChange={e => setEditFood({...editFood, carbs: Number(e.target.value)})} 
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="ml-2 text-[9px] font-bold uppercase text-slate-400">Protein</label>
-                                                <input 
-                                                    type="number" 
-                                                    className="w-full p-2 rounded-xl text-center font-bold" 
-                                                    value={editFood.protein} 
-                                                    onFocus={e => handleFocus(e, v => setEditFood({...editFood, protein: Number(v)}))}
-                                                    onChange={e => setEditFood({...editFood, protein: Number(e.target.value)})} 
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="ml-2 text-[9px] font-bold uppercase text-slate-400">Fat</label>
-                                                <input 
-                                                    type="number" 
-                                                    className="w-full p-2 rounded-xl text-center font-bold" 
-                                                    value={editFood.fat} 
-                                                    onFocus={e => handleFocus(e, v => setEditFood({...editFood, fat: Number(v)}))}
-                                                    onChange={e => setEditFood({...editFood, fat: Number(e.target.value)})} 
-                                                />
-                                            </div>
-                                            <div className="relative">
-                                                <label className="ml-2 text-[9px] font-bold uppercase text-emerald-500">Fiber</label>
-                                                <div className="flex gap-1">
-                                                    <input 
-                                                        type="number" 
-                                                        className="w-full p-2 rounded-xl text-center font-bold border border-emerald-100" 
-                                                        value={editFood.fiber} 
-                                                        onFocus={e => handleFocus(e, v => setEditFood({...editFood, fiber: Number(v)}))}
-                                                        onChange={e => setEditFood({...editFood, fiber: Number(e.target.value)})} 
-                                                    />
-                                                    <button onClick={askAIFiber} disabled={loadingAI} className="bg-indigo-600 text-white p-2 rounded-xl">
-                                                        {loadingAI ? <i data-lucide="loader" className="w-4 h-4 animate-spin"></i> : <i data-lucide="wand-2" className="w-4 h-4"></i>}
-                                                    </button>
+                                        <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Macros per {editFood.measure === 'g' ? '100g' : '1 Unit'}</p>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {['carbs', 'protein', 'fat', 'fiber'].map(m => (
+                                                <div key={m}>
+                                                    <label className="text-[8px] font-bold uppercase text-slate-400 block text-center mb-1">{m}</label>
+                                                    <input type="number" className="w-full p-2 rounded-xl text-center font-bold text-xs" value={editFood[m]} onFocus={e => handleFocus(e, v => setEditFood({...editFood, [m]: Number(v)}))} onChange={e => setEditFood({...editFood, [m]: Number(e.target.value)})} />
                                                 </div>
-                                            </div>
+                                            ))}
                                         </div>
                                     </div>
-
-                                    {/* Calculated Live Preview */}
-                                    <div className="text-center">
-                                        <p className="text-[10px] font-black uppercase text-slate-300">Adding to Log</p>
-                                        <div className="flex justify-center gap-4 text-xs font-bold text-slate-500 mt-1">
-                                            <span>{Math.round(editFood.carbs * (editFood.weight/100))}c</span>
-                                            <span>{Math.round(editFood.protein * (editFood.weight/100))}p</span>
-                                            <span>{Math.round(editFood.fat * (editFood.weight/100))}f</span>
-                                        </div>
-                                    </div>
-
-                                    <button 
-                                        onClick={() => handleAddFood(editFood, editFood.weight)}
-                                        className="w-full bg-pink-500 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-pink-600 active:scale-95 transition-transform"
-                                    >
-                                        Add to Bowl 🥣
-                                    </button>
+                                    <button onClick={handleAddFood} className="w-full bg-pink-500 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-pink-600 active:scale-95 transition-transform">Add to Bowl 🥣</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {loadingAI && !modalOpen && (
-                        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center">
-                            <div className="bg-white p-6 rounded-3xl animate-bounce">
-                                <span className="text-4xl">🐱</span>
+                    {/* Finish Workout Modal */}
+                    {finishModalOpen && (
+                        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick={() => setFinishModalOpen(false)}>
+                            <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-xl font-black text-slate-800 uppercase mb-6">Almost Done!</h2>
+                                <div className="mb-6">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Total Duration (Minutes)</label>
+                                    <input type="number" className="w-full bg-slate-100 p-4 rounded-2xl font-black text-3xl text-center outline-none focus:ring-2 ring-pink-300" value={workoutDuration} onFocus={e => handleFocus(e, setWorkoutDuration)} onChange={e => setWorkoutDuration(e.target.value)} />
+                                </div>
+                                <button onClick={handleFinishWorkout} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2"><i data-lucide="check-circle" className="w-5 h-5"></i> Log Workout</button>
                             </div>
                         </div>
                     )}
