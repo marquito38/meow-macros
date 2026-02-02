@@ -41,12 +41,6 @@
         }
         .animate-swat { animation: swat 1s ease-in-out forwards; }
 
-        @keyframes bounce-cat { 
-            0%, 100% { transform: translateY(0); } 
-            50% { transform: translateY(-10px); } 
-        }
-        .animate-bounce-cat { animation: bounce-cat 2s infinite; }
-
         @keyframes pop-in {
             0% { transform: scale(0.8); opacity: 0; }
             100% { transform: scale(1); opacity: 1; }
@@ -81,36 +75,36 @@
             A: {
                 name: "Workout A (Push)",
                 exercises: [
-                    { name: "DB Incline Bench", target: "3x6-8", sets: 3 },
-                    { name: "DB Goblet Squats", target: "3x8-10", sets: 3 },
-                    { name: "FT Lateral Raises", target: "4x12-15", sets: 4 },
-                    { name: "FT Tricep Ext", target: "3x10-12", sets: 3 },
-                    { name: "Jump Rope HIIT", target: "10 mins", sets: 1 }
+                    { name: "DB Incline Bench", sets: 3 },
+                    { name: "DB Goblet Squats", sets: 3 },
+                    { name: "FT Lateral Raises", sets: 4 },
+                    { name: "FT Tricep Ext", sets: 3 },
+                    { name: "Jump Rope HIIT", sets: 1 }
                 ]
             },
             B: {
                 name: "Workout B (Pull)",
                 exercises: [
-                    { name: "DB Romanian DL", target: "3x6-8", sets: 3 },
-                    { name: "FT Row/Pulldown", target: "3x8-10", sets: 3 },
-                    { name: "DB Rear Delt Fly", target: "3x15", sets: 3 },
-                    { name: "DB Bicep Curls", target: "3x10-12", sets: 3 },
-                    { name: "Bike HIIT", target: "10 mins", sets: 1 }
+                    { name: "DB Romanian DL", sets: 3 },
+                    { name: "FT Row/Pulldown", sets: 3 },
+                    { name: "DB Rear Delt Fly", sets: 3 },
+                    { name: "DB Bicep Curls", sets: 3 },
+                    { name: "Bike HIIT", sets: 1 }
                 ]
             }
         };
 
         const STARTER_LIBRARY = [
-            { id: '1', name: 'Egg Whites', carbs: 0, protein: 11.7, fat: 0, fiber: 0, measure: 'g' },
-            { id: '2', name: 'Greek Yogurt', carbs: 3.5, protein: 9.4, fat: 0, fiber: 0, measure: 'g' },
-            { id: '3', name: 'Banana', carbs: 23, protein: 1, fat: 0.3, fiber: 2.6, measure: 'g' },
-            { id: '4', name: 'Whole Egg', carbs: 0.6, protein: 6, fat: 5, fiber: 0, measure: 'unit' }, // Updated for unit
-            { id: '5', name: 'Salmon (Raw)', carbs: 0, protein: 22, fat: 12, fiber: 0, measure: 'g' },
-            { id: '6', name: 'Garbanzo Beans', carbs: 17, protein: 5, fat: 1.5, fiber: 5, measure: 'g' }, 
-            { id: '7', name: 'Corn', carbs: 7, protein: 0.8, fat: 0.4, fiber: 2, measure: 'g' }, 
-            { id: '8', name: 'Mixed Berries', carbs: 9, protein: 0.5, fat: 0, fiber: 3, measure: 'g' },
-            { id: '9', name: 'Avocado', carbs: 8.5, protein: 2, fat: 14.7, fiber: 6.7, measure: 'g' },
-            { id: '10', name: 'Chicken Breast', carbs: 0, protein: 31, fat: 3.6, fiber: 0, measure: 'g' }
+            { id: '1', name: 'Egg Whites', carbs: 0, protein: 11.7, fat: 0, fiber: 0, measure: 'g', baseWeight: 100 },
+            { id: '2', name: 'Greek Yogurt', carbs: 3.5, protein: 9.4, fat: 0, fiber: 0, measure: 'g', baseWeight: 100 },
+            { id: '3', name: 'Banana', carbs: 23, protein: 1, fat: 0.3, fiber: 2.6, measure: 'g', baseWeight: 100 },
+            { id: '4', name: 'Whole Egg', carbs: 0.6, protein: 6, fat: 5, fiber: 0, measure: 'unit', baseWeight: 1 }, 
+            { id: '5', name: 'Salmon (Raw)', carbs: 0, protein: 22, fat: 12, fiber: 0, measure: 'g', baseWeight: 100 },
+            { id: '6', name: 'Garbanzo Beans', carbs: 17, protein: 5, fat: 1.5, fiber: 5, measure: 'g', baseWeight: 100 }, 
+            { id: '7', name: 'Corn', carbs: 7, protein: 0.8, fat: 0.4, fiber: 2, measure: 'g', baseWeight: 100 }, 
+            { id: '8', name: 'Mixed Berries', carbs: 9, protein: 0.5, fat: 0, fiber: 3, measure: 'g', baseWeight: 100 },
+            { id: '9', name: 'Avocado', carbs: 8.5, protein: 2, fat: 14.7, fiber: 6.7, measure: 'g', baseWeight: 100 },
+            { id: '10', name: 'Chicken Breast', carbs: 0, protein: 31, fat: 3.6, fiber: 0, measure: 'g', baseWeight: 100 }
         ];
 
         const MOTIVATION_QUOTES = ["Crushed it! 🐾", "Paws-itively Strong! 💪", "Feline ferocious today! 🦁", "You're the cat's pajamas! 😻", "Purr-fect Performance! ⭐"];
@@ -197,7 +191,7 @@
             // UI State
             const [modalOpen, setModalOpen] = useState(false);
             const [finishModalOpen, setFinishModalOpen] = useState(false);
-            const [successModalData, setSuccessModalData] = useState(null); // {title, msg, subtext}
+            const [successModalData, setSuccessModalData] = useState(null); 
             const [swatTrigger, setSwatTrigger] = useState(false);
             
             // Food Input
@@ -219,21 +213,42 @@
 
             // Init
             useEffect(() => {
-                const saved = localStorage.getItem('meow_data_v6'); 
+                const saved = localStorage.getItem('meow_data_v7'); // Incremented for structure
                 if (saved) {
                     const parsed = JSON.parse(saved);
                     if (!parsed.fitnessHistory) parsed.fitnessHistory = {};
                     setData(parsed);
                 } else {
-                     // Migration from v5
-                    const old = localStorage.getItem('meow_data_v5');
+                    const old = localStorage.getItem('meow_data_v6');
                     if(old) setData(JSON.parse(old));
                 }
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('meow_data_v6', JSON.stringify(data));
+                localStorage.setItem('meow_data_v7', JSON.stringify(data));
             }, [data]);
+
+            // STICKY 0 GLOBAL FIX
+            useEffect(() => {
+                const applyStickyFix = () => {
+                    document.querySelectorAll('input[type="number"]').forEach(input => {
+                        input.removeEventListener('focus', handleStickyFocus);
+                        input.removeEventListener('blur', handleStickyBlur);
+                        input.addEventListener('focus', handleStickyFocus);
+                        input.addEventListener('blur', handleStickyBlur);
+                    });
+                };
+
+                const handleStickyFocus = function() { if (this.value === '0') this.value = ''; };
+                const handleStickyBlur = function() { if (this.value === '') this.value = '0'; };
+
+                // Apply on mount and updates
+                applyStickyFix();
+                // Re-apply when modals open
+                const interval = setInterval(applyStickyFix, 500);
+                return () => clearInterval(interval);
+            }, [modalOpen, finishModalOpen, view]);
+
 
             // Timer Loop
             useEffect(() => {
@@ -293,19 +308,16 @@
 
             // --- ACTIONS ---
             const handleAddFood = () => {
-                const isGram = editFood.measure === 'g';
-                // Logic: If 'g', inputs are per 100g. If 'unit', inputs are per unit.
-                const factor = isGram ? (editFood.weight / 100) : editFood.weight; // weight state holds qty for units
-                
+                // Store EXACTLY what user typed
                 const newEntry = {
                     id: Date.now(),
                     name: editFood.name,
-                    weight: editFood.weight, // display value
+                    weight: editFood.weight, 
                     measure: editFood.measure,
-                    c: editFood.carbs * factor,
-                    p: editFood.protein * factor,
-                    f: editFood.fat * factor,
-                    fib: editFood.fiber * factor,
+                    c: editFood.carbs,
+                    p: editFood.protein,
+                    f: editFood.fat,
+                    fib: editFood.fiber,
                     category: editFood.category
                 };
 
@@ -331,15 +343,16 @@
 
             const openAddFood = (item = null) => {
                 if (item) {
-                    // Load existing
+                    // Smart load: Calculate totals based on default base weight if needed
+                    // User wants "Actual amount I am eating". 
+                    // We'll pre-fill with the base unit values from library as a starting point.
                     setEditFood({ 
                         ...item, 
-                        weight: item.measure === 'unit' ? 1 : 100, // Default qty
+                        weight: item.measure === 'unit' ? 1 : 100,
                         measure: item.measure || 'g' 
                     });
                     setIsNew(false);
                 } else {
-                    // Fresh
                     setEditFood({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack', measure: 'g' });
                     setIsNew(true);
                 }
@@ -378,7 +391,6 @@
                     if (calorieChartRef.current) calorieChartRef.current.destroy();
                     if (volumeChartRef.current) volumeChartRef.current.destroy();
 
-                    // Data Prep
                     const labels = [];
                     const calsIn = [];
                     const calsOut = [];
@@ -390,7 +402,6 @@
                         const k = d.toISOString().split('T')[0];
                         labels.push(d.toLocaleDateString('en-US', {weekday:'short'}));
                         
-                        // Cals
                         const log = data.history[k] || [];
                         const fit = data.fitnessHistory[k] || [];
                         const dayIn = log.reduce((s, x) => s + calcCals(x.c,x.p,x.f), 0);
@@ -398,7 +409,6 @@
                         calsIn.push(dayIn);
                         calsOut.push(BASE_BMR + dayBurn);
 
-                        // Volume
                         let dayVol = 0;
                         fit.forEach(sess => {
                             if (sess.exercises) {
@@ -410,7 +420,6 @@
                         volumeData.push(dayVol);
                     }
 
-                    // Chart 1: Cals
                     calorieChartRef.current = new Chart(document.getElementById('calChart'), {
                         type: 'bar',
                         data: {
@@ -423,7 +432,6 @@
                         options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: false }, y: { beginAtZero: true } } }
                     });
 
-                    // Chart 2: Volume
                     volumeChartRef.current = new Chart(document.getElementById('volChart'), {
                         type: 'line',
                         data: {
@@ -446,8 +454,7 @@
                 };
             }, [view, data]);
 
-
-            // --- SCREENS ---
+            // --- RENDERERS ---
 
             const renderHome = () => (
                 <div className="space-y-6 pb-20 safe-pb">
@@ -548,7 +555,6 @@
                                             const setData = currentSets[setIdx] || {weight: 0, reps: 0, difficulty: '😼'};
                                             const updateSet = (field, val) => {
                                                 const newSets = [...currentSets];
-                                                // Fill gaps
                                                 while(newSets.length <= setIdx) newSets.push({weight:0, reps:0, difficulty:'😼'});
                                                 newSets[setIdx] = { ...newSets[setIdx], [field]: val };
                                                 setWorkoutInputs({ ...workoutInputs, [ex.name]: newSets });
@@ -567,12 +573,12 @@
                             );
                         })}
                     </div>
+                    {/* Fixed: Removed Duration Input from here */}
                     <button onClick={() => setFinishModalOpen(true)} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2 sticky bottom-24 z-20"><i data-lucide="check-circle" className="w-5 h-5"></i> Finish Workout</button>
                 </div>
             );
 
             const renderTrends = () => {
-                // Workout History
                 const pastWorkouts = Object.entries(data.fitnessHistory)
                     .flatMap(([d, logs]) => logs.map(l => ({ date: d, ...l })))
                     .sort((a, b) => b.id - a.id)
@@ -581,17 +587,14 @@
                 return (
                     <div className="pb-20 safe-pb space-y-6">
                         <h2 className="text-2xl font-black text-slate-700">Trends & History</h2>
-                        
                         <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
                             <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Calories: In vs Out</h3>
                             <div className="h-52"><canvas id="calChart"></canvas></div>
                         </div>
-
                         <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
                             <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Volume Lifted</h3>
                             <div className="h-52"><canvas id="volChart"></canvas></div>
                         </div>
-
                         <div className="space-y-3">
                             <h3 className="font-bold text-slate-700">Workout Log</h3>
                             {pastWorkouts.length === 0 ? <p className="text-xs text-slate-400">No workouts yet.</p> : pastWorkouts.map(w => {
@@ -674,12 +677,14 @@
                                     <input className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none text-xs" value={editFood.name} onChange={e => setEditFood({...editFood, name: e.target.value})} placeholder="Food Name" />
                                     
                                     <div>
+                                        {/* Dynamic Label */}
                                         <label className="text-[10px] font-black uppercase text-slate-400 ml-2">{editFood.measure === 'g' ? 'Weight (g)' : 'Quantity'}</label>
                                         <input type="number" className="w-full bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none text-center" value={editFood.weight} onFocus={e => handleFocus(e, v => setEditFood({...editFood, weight: Number(v)}))} onChange={e => setEditFood({...editFood, weight: Number(e.target.value)})} />
                                     </div>
 
                                     <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                                        <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Macros per {editFood.measure === 'g' ? '100g' : '1 Unit'}</p>
+                                        {/* Fixed Macro Label */}
+                                        <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Macros for this entire entry</p>
                                         <div className="grid grid-cols-4 gap-2">
                                             {['carbs', 'protein', 'fat', 'fiber'].map(m => (
                                                 <div key={m}>
@@ -700,6 +705,7 @@
                         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick={() => setFinishModalOpen(false)}>
                             <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10" onClick={e => e.stopPropagation()}>
                                 <h2 className="text-xl font-black text-slate-800 uppercase mb-6">Almost Done!</h2>
+                                {/* Fixed: Duration Input Moved Here */}
                                 <div className="mb-6">
                                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Total Duration (Minutes)</label>
                                     <input type="number" className="w-full bg-slate-100 p-4 rounded-2xl font-black text-3xl text-center outline-none focus:ring-2 ring-pink-300" value={workoutDuration} onFocus={e => handleFocus(e, setWorkoutDuration)} onChange={e => setWorkoutDuration(e.target.value)} />
