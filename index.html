@@ -12,6 +12,9 @@
     <!-- PWA Icons -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' x='10' font-size='80'>🐱</text></svg>">
     
+    <!-- Required Fix: Material Icons Link -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    
     <!-- CDNs -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -486,8 +489,8 @@
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <button onClick={() => openAddFood()} className="bg-teal-500 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"><i data-lucide="plus-circle" className="w-6 h-6"></i> Add Food</button>
-                        <button onClick={() => fileInputRef.current.click()} className="bg-indigo-500 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"><i data-lucide="camera" className="w-6 h-6"></i> AI Scan</button>
+                        <button onClick={() => openAddFood()} className="bg-teal-500 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"><span className="material-icons-round text-2xl">add_circle</span> Add Food</button>
+                        <button onClick={() => fileInputRef.current.click()} className="bg-indigo-500 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"><span className="material-icons-round text-2xl">photo_camera</span> AI Scan</button>
                         <input type="file" ref={fileInputRef} className="hidden" />
                     </div>
 
@@ -506,7 +509,7 @@
                                         {item.weight}{item.measure} • {Math.round(calcCals(item.c, item.p, item.f))} cal • <span className="text-emerald-500">{item.fib.toFixed(1)}g Fib</span>
                                     </p>
                                 </div>
-                                <button onClick={() => setData({...data, history: {...data.history, [date]: todayLog.filter(i=>i.id!==item.id)}})} className="text-slate-300 hover:text-red-400"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                                <button onClick={() => setData({...data, history: {...data.history, [date]: todayLog.filter(i=>i.id!==item.id)}})} className="text-slate-300 hover:text-red-400"><span className="material-icons-round text-base">delete</span></button>
                             </div>
                         ))}
                     </div>
@@ -574,7 +577,7 @@
                         })}
                     </div>
                     {/* Fixed: Removed Duration Input from here */}
-                    <button onClick={() => setFinishModalOpen(true)} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2 sticky bottom-24 z-20"><i data-lucide="check-circle" className="w-5 h-5"></i> Finish Workout</button>
+                    <button onClick={() => setFinishModalOpen(true)} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2 sticky bottom-24 z-20"><span className="material-icons-round text-xl">check_circle</span> Finish Workout</button>
                 </div>
             );
 
@@ -621,7 +624,7 @@
                     <div className="sticky top-0 bg-[#FFF0F5] z-30 pb-4 pt-2">
                         <h2 className="text-2xl font-black text-slate-700 mb-4">Food Library</h2>
                         <div className="relative">
-                            <i data-lucide="search" className="absolute left-4 top-3 text-slate-400 w-4 h-4"></i>
+                            <span className="material-icons-round absolute left-4 top-3 text-slate-400 text-base">search</span>
                             <input className="w-full bg-white pl-10 pr-4 py-3 rounded-2xl shadow-sm outline-none focus:ring-2 ring-pink-300 font-bold text-sm text-slate-700" placeholder="Search foods..." value={librarySearch} onChange={e => setLibrarySearch(e.target.value)} />
                         </div>
                     </div>
@@ -632,7 +635,7 @@
                                     <p className="font-bold text-slate-700">{item.name}</p>
                                     <p className="text-[10px] text-slate-400 uppercase">Per {item.measure === 'unit' ? 'Unit' : '100g'}: C:{Math.round(item.carbs)} P:{Math.round(item.protein)}</p>
                                 </div>
-                                <div className="bg-slate-100 p-2 rounded-full"><i data-lucide="plus" className="w-4 h-4 text-slate-400"></i></div>
+                                <div className="bg-slate-100 p-2 rounded-full"><span className="material-icons-round text-base text-slate-400">add</span></div>
                             </button>
                         ))}
                     </div>
@@ -653,10 +656,10 @@
 
                     {/* Nav */}
                     <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[400px] bg-white/90 backdrop-blur-md border border-white/50 shadow-xl rounded-full p-2 flex justify-around items-center z-40 safe-pb">
-                        <button onClick={() => setView('home')} className={`p-3 rounded-full transition-all ${view==='home'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="home" className="w-5 h-5"></i></button>
-                        <button onClick={() => setView('fitness')} className={`p-3 rounded-full transition-all ${view==='fitness'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="dumbbell" className="w-5 h-5"></i></button>
-                        <button onClick={() => setView('library')} className={`p-3 rounded-full transition-all ${view==='library'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="book" className="w-5 h-5"></i></button>
-                        <button onClick={() => setView('trends')} className={`p-3 rounded-full transition-all ${view==='trends'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><i data-lucide="bar-chart-2" className="w-5 h-5"></i></button>
+                        <button onClick={() => setView('home')} className={`p-3 rounded-full transition-all ${view==='home'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><span className="material-icons-round text-xl">home</span></button>
+                        <button onClick={() => setView('fitness')} className={`p-3 rounded-full transition-all ${view==='fitness'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><span className="material-icons-round text-xl">fitness_center</span></button>
+                        <button onClick={() => setView('library')} className={`p-3 rounded-full transition-all ${view==='library'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><span className="material-icons-round text-xl">menu_book</span></button>
+                        <button onClick={() => setView('trends')} className={`p-3 rounded-full transition-all ${view==='trends'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><span className="material-icons-round text-xl">insights</span></button>
                     </nav>
 
                     {/* Add Food Modal */}
@@ -710,7 +713,7 @@
                                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Total Duration (Minutes)</label>
                                     <input type="number" className="w-full bg-slate-100 p-4 rounded-2xl font-black text-3xl text-center outline-none focus:ring-2 ring-pink-300" value={workoutDuration} onFocus={e => handleFocus(e, setWorkoutDuration)} onChange={e => setWorkoutDuration(e.target.value)} />
                                 </div>
-                                <button onClick={handleFinishWorkout} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2"><i data-lucide="check-circle" className="w-5 h-5"></i> Log Workout</button>
+                                <button onClick={handleFinishWorkout} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2"><span className="material-icons-round text-xl">check_circle</span> Log Workout</button>
                             </div>
                         </div>
                     )}
