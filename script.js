@@ -407,8 +407,18 @@ function App() {
         <div className="space-y-6 pb-20 safe-pb">
             <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-2">
-                    {/* FIX 1: Reliable Nyan Cat Link (Giphy) */}
-                    <img src="https://media.giphy.com/media/sIIhZliB2McAo/giphy.gif" alt="Nyan Cat" className="w-10 h-10 object-contain rounded-full border border-pink-200" />
+                    {/* FIX 1: Reliable Nyan Cat Link (Giphy) - UPDATED V2.4 Styling */}
+                    <img 
+                        src="https://media.giphy.com/media/sIIhZliB2McAo/giphy.gif" 
+                        alt="Nyan Cat" 
+                        style={{
+                            height: '65px',           // Much bigger (was 40px)
+                            width: 'auto',            // Maintain aspect ratio
+                            borderRadius: '0',        // FORCE rectangle (removes circular clipping)
+                            verticalAlign: 'middle', 
+                            marginRight: '15px' 
+                        }} 
+                    />
                     <h1 className="text-2xl font-black text-pink-500 tracking-tight">Meow Macros</h1>
                 </div>
             </div>
