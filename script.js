@@ -45,19 +45,17 @@ const STARTER_LIBRARY = [
 const MOTIVATION_QUOTES = ["Crushed it! 🐾", "Paws-itively Strong! 💪", "Feline ferocious today! 🦁", "You're the cat's pajamas! 😻", "Purr-fect Performance! ⭐"];
 
 // --- HELPERS ---
-const calcCals = (c, p, f) => Math.round((c * 4) + (p * 4) + (f * 9));
 
-const getFoodEmoji = (name) => {
-    const n = name.toLowerCase();
-    if (n.includes('egg')) return '🥚';
-    if (n.includes('banana')) return '🍌';
-    if (n.includes('yogurt')) return '🥣';
-    if (n.includes('salmon') || n.includes('fish')) return '🐟';
-    if (n.includes('chicken') || n.includes('turkey')) return '🍗';
-    if (n.includes('avocado')) return '🥑';
-    if (n.includes('berry')) return '🍓';
-    return '🥗';
+// CRITICAL FIX: Timezone-aware date string (YYYY-MM-DD)
+// Prevents app from switching to "tomorrow" based on UTC time
+const getLocalYMD = () => {
+    const now = new Date();
+    // Shift time by timezone offset to get correct local date components
+    const local = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+    return local.toISOString().split('T')[0];
 };
+
+const calcCals = (c, p, f) => Math.round((c * 4) + (p * 4) + (f * 9));
 
 const getVolumeAnimal = (vol) => {
     if(vol > 300000) return "a Blue Whale 🐋";
@@ -101,7 +99,7 @@ const ProgressBar = ({ current, max, color, label, reverse = false }) => {
     const pct = Math.min(100, Math.max(0, (current / max) * 100));
     const remaining = reverse ? max - current : current;
     const isOver = reverse && current > max;
-    const displayVal = isOver ? `${Math.round(current - max)}g over` : `${Math.round(remaining)}g ${reverse ? 'left' : 'done'}`;
+    const displayVal = `${Math.round(current)}g / ${max}g (${isOver ? Math.round(current - max) + 'g over' : Math.round(remaining) + 'g left'})`;
     
     return (
         <div className="flex flex-col w-full mb-3">
@@ -118,10 +116,10 @@ const ProgressBar = ({ current, max, color, label, reverse = false }) => {
 
 // --- MAIN APP ---
 function App() {
-    // State
+    // State - Initialized with Local Date (Fix for early wipe)
     const [view, setView] = useState('home');
     const [data, setData] = useState({ history: {}, fitnessHistory: {}, library: STARTER_LIBRARY, settings: { apiKey: '' } });
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(getLocalYMD());
     
     // UI State
     const [modalOpen, setModalOpen] = useState(false);
@@ -129,12 +127,10 @@ function App() {
     const [successModalData, setSuccessModalData] = useState(null); 
     const [swatTrigger, setSwatTrigger] = useState(false);
     
-    // Food Input
+    // Inputs
     const [editFood, setEditFood] = useState({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack', measure: 'g' });
     const [librarySearch, setLibrarySearch] = useState('');
     const [isNew, setIsNew] = useState(true);
-
-    // Fitness Input
     const [activeRoutine, setActiveRoutine] = useState('A');
     const [workoutDuration, setWorkoutDuration] = useState(40);
     const [workoutInputs, setWorkoutInputs] = useState({});
@@ -146,24 +142,43 @@ function App() {
     const fileInputRef = useRef(null);
     const timerRef = useRef(null);
 
-    // Init
+    // CRITICAL: Check for date rollover on mount and focus
     useEffect(() => {
-        const saved = localStorage.getItem('meow_data_v7'); 
+        const checkDateReset = () => {
+            const currentLocal = getLocalYMD();
+            if (currentLocal !== date) {
+                console.log("Local date changed, updating view.");
+                setDate(currentLocal);
+            }
+        };
+
+        // Check on mount
+        checkDateReset();
+
+        // Check when window regains focus (e.g. opening app next morning)
+        window.addEventListener('focus', checkDateReset);
+        return () => window.removeEventListener('focus', checkDateReset);
+    }, [date]);
+
+    // Init Data
+    useEffect(() => {
+        const saved = localStorage.getItem('meow_data_v8');
         if (saved) {
             const parsed = JSON.parse(saved);
             if (!parsed.fitnessHistory) parsed.fitnessHistory = {};
             setData(parsed);
         } else {
-            const old = localStorage.getItem('meow_data_v6');
+            const old = localStorage.getItem('meow_data_v7');
             if(old) setData(JSON.parse(old));
         }
     }, []);
 
+    // Persist Data
     useEffect(() => {
-        localStorage.setItem('meow_data_v7', JSON.stringify(data));
+        localStorage.setItem('meow_data_v8', JSON.stringify(data));
     }, [data]);
 
-    // FIX 5: STICKY 0 GLOBAL FIX
+    // Sticky 0 Fix
     useEffect(() => {
         const applyStickyFix = () => {
             document.querySelectorAll('input[type="number"]').forEach(input => {
@@ -173,10 +188,8 @@ function App() {
                 input.addEventListener('blur', handleStickyBlur);
             });
         };
-
         const handleStickyFocus = function() { if (this.value === '0') this.value = ''; };
         const handleStickyBlur = function() { if (this.value === '') this.value = '0'; };
-
         applyStickyFix();
         const interval = setInterval(applyStickyFix, 500);
         return () => clearInterval(interval);
@@ -188,16 +201,14 @@ function App() {
             setTimers(prev => {
                 const next = { ...prev };
                 let changed = false;
-                Object.keys(next).forEach(k => {
-                    if (next[k] > 0) { next[k]--; changed = true; }
-                });
+                Object.keys(next).forEach(k => { if (next[k] > 0) { next[k]--; changed = true; } });
                 return changed ? next : prev;
             });
         }, 1000);
         return () => clearInterval(timerRef.current);
     }, []);
 
-    // Calculations
+    // Derived Data
     const todayLog = data.history[date] || [];
     const todayWorkouts = data.fitnessHistory[date] || [];
     const totals = todayLog.reduce((acc, item) => ({
@@ -209,10 +220,8 @@ function App() {
     const adjustedCalorieGoal = GOALS.calories + totalBurnedCals;
     const remainingCals = adjustedCalorieGoal - totalEatenCals;
 
-    // --- HELPERS ---
-    const handleFocus = (e, setter) => {
-        if (Number(e.target.value) === 0) setter('');
-    };
+    // Helpers
+    const handleFocus = (e, setter) => { if (Number(e.target.value) === 0) setter(''); };
 
     const formatLastLog = (exName) => {
         const dates = Object.keys(data.fitnessHistory).sort().reverse();
@@ -233,14 +242,13 @@ function App() {
         return [...lib].sort((a, b) => {
             const aLast = a.lastUsed || 0;
             const bLast = b.lastUsed || 0;
-            if (bLast !== aLast) return bLast - aLast; // Recent first
-            return a.name.localeCompare(b.name); // Then Alphabetical
+            if (bLast !== aLast) return bLast - aLast; 
+            return a.name.localeCompare(b.name); 
         });
     };
 
-    // --- ACTIONS ---
+    // Actions
     const handleAddFood = () => {
-        // FIX 4: Unit Logic (Store user input directly)
         const newEntry = {
             id: Date.now(),
             name: editFood.name,
@@ -313,7 +321,17 @@ function App() {
         });
     };
 
-    // --- CHARTS ---
+    const handleDeleteWorkout = (logId, logDate) => {
+        if(confirm("Delete this workout log?")) {
+            const dayLogs = data.fitnessHistory[logDate].filter(l => l.id !== logId);
+            setData({
+                ...data,
+                fitnessHistory: { ...data.fitnessHistory, [logDate]: dayLogs }
+            });
+        }
+    };
+
+    // Charts
     useEffect(() => {
         if (view === 'trends') {
             if (calorieChartRef.current) calorieChartRef.current.destroy();
@@ -382,12 +400,14 @@ function App() {
         };
     }, [view, data]);
 
-    // --- RENDERERS ---
-
+    // Renders
     const renderHome = () => (
         <div className="space-y-6 pb-20 safe-pb">
             <div className="flex justify-between items-center mb-2">
-                <h1 className="text-2xl font-black text-pink-500 tracking-tight flex items-center gap-2"><span className="text-3xl">🐱</span> Meow Macros</h1>
+                <div className="flex items-center gap-2">
+                    <img src="https://i.gifer.com/origin/36/36584033230a1122a6136a87796d13cb_w200.gif" alt="Nyan Cat" className="w-10 h-10 object-contain rounded-full border border-pink-200" />
+                    <h1 className="text-2xl font-black text-pink-500 tracking-tight">Meow Macros</h1>
+                </div>
             </div>
 
             <div className="glass-panel p-5 rounded-3xl shadow-lg border-b-4 border-pink-200 relative overflow-hidden">
@@ -471,8 +491,7 @@ function App() {
                                 <button onClick={() => setTimers(prev => ({...prev, [ex.name]: prev[ex.name]>0 ? 0 : 90}))} className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-colors ${timeLeft > 0 ? 'bg-pink-100 text-pink-500' : 'bg-slate-100 text-slate-500'}`}>{timeLeft > 0 ? 'Stop 🛑' : 'Cat Nap 😺'}</button>
                             </div>
 
-                            {/* FIX 3: CSS Grid Header */}
-                            <div className="fitness-grid mb-2 px-1 text-center">
+                            <div className="workout-grid mb-2 px-1 text-center">
                                 <span className="text-[9px] font-black uppercase text-slate-300">Set</span>
                                 <span className="text-[9px] font-black uppercase text-slate-300">Lbs</span>
                                 <span className="text-[9px] font-black uppercase text-slate-300">Reps</span>
@@ -489,11 +508,11 @@ function App() {
                                         setWorkoutInputs({ ...workoutInputs, [ex.name]: newSets });
                                     };
                                     return (
-                                        <div key={setIdx} className="fitness-grid">
+                                        <div key={setIdx} className="workout-grid">
                                             <div className="text-center font-black text-slate-300 text-xs">{setIdx + 1}</div>
-                                            <input type="number" className="bg-slate-50 p-2 rounded-xl text-center font-bold text-sm outline-none focus:ring-1 ring-pink-300" value={setData.weight} onFocus={e => handleFocus(e, v => updateSet('weight', v))} onChange={e => updateSet('weight', Number(e.target.value))} />
-                                            <input type="number" className="bg-slate-50 p-2 rounded-xl text-center font-bold text-sm outline-none focus:ring-1 ring-pink-300" value={setData.reps} onFocus={e => handleFocus(e, v => updateSet('reps', v))} onChange={e => updateSet('reps', Number(e.target.value))} />
-                                            <select className="bg-slate-50 p-2 rounded-xl text-center text-sm appearance-none outline-none" value={setData.difficulty} onChange={e => updateSet('difficulty', e.target.value)}><option>😺</option><option>😼</option><option>🙀</option></select>
+                                            <input type="number" className="bg-slate-50 p-2 rounded-xl text-center font-bold text-xs outline-none focus:ring-1 ring-pink-300" value={setData.weight} onFocus={e => handleFocus(e, v => updateSet('weight', v))} onChange={e => updateSet('weight', Number(e.target.value))} />
+                                            <input type="number" className="bg-slate-50 p-2 rounded-xl text-center font-bold text-xs outline-none focus:ring-1 ring-pink-300" value={setData.reps} onFocus={e => handleFocus(e, v => updateSet('reps', v))} onChange={e => updateSet('reps', Number(e.target.value))} />
+                                            <select className="bg-slate-50 p-2 rounded-xl text-center text-xs appearance-none outline-none" value={setData.difficulty} onChange={e => updateSet('difficulty', e.target.value)}><option>😺</option><option>😼</option><option>🙀</option></select>
                                         </div>
                                     );
                                 })}
@@ -502,48 +521,9 @@ function App() {
                     );
                 })}
             </div>
-            {/* FIX 2: Moved Duration Input to Modal */}
             <button onClick={() => setFinishModalOpen(true)} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2 sticky bottom-24 z-20"><span className="material-icons-round text-xl">check_circle</span> Finish Workout</button>
         </div>
     );
-
-    const renderTrends = () => {
-        const pastWorkouts = Object.entries(data.fitnessHistory)
-            .flatMap(([d, logs]) => logs.map(l => ({ date: d, ...l })))
-            .sort((a, b) => b.id - a.id)
-            .slice(0, 10);
-
-        return (
-            <div className="pb-20 safe-pb space-y-6">
-                <h2 className="text-2xl font-black text-slate-700">Trends & History</h2>
-                <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
-                    <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Calories: In vs Out</h3>
-                    <div className="h-52"><canvas id="calChart"></canvas></div>
-                </div>
-                <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
-                    <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Volume Lifted</h3>
-                    <div className="h-52"><canvas id="volChart"></canvas></div>
-                </div>
-                <div className="space-y-3">
-                    <h3 className="font-bold text-slate-700">Workout Log</h3>
-                    {pastWorkouts.length === 0 ? <p className="text-xs text-slate-400">No workouts yet.</p> : pastWorkouts.map(w => {
-                        let vol = 0;
-                        Object.values(w.exercises || {}).forEach(sets => sets.forEach(s => vol += (s.weight||0)*(s.reps||0)));
-                        return (
-                            <div key={w.id} className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-400">
-                                <div className="flex justify-between">
-                                    <p className="font-bold text-slate-700 text-sm">Workout {w.routine} <span className="text-xs font-normal text-slate-400">({w.date})</span></p>
-                                    <p className="text-xs font-bold text-pink-500">{w.calories} cal</p>
-                                </div>
-                                <p className="text-[10px] text-slate-500 mt-1">Total Volume: <span className="font-black">{vol.toLocaleString()} lbs</span></p>
-                                <p className="text-[10px] text-indigo-500 italic">That's heavy! Like {getVolumeAnimal(vol)}</p>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
 
     const renderLibrary = () => (
         <div className="pb-20 safe-pb">
@@ -597,7 +577,6 @@ function App() {
                             <button onClick={() => setModalOpen(false)} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center font-bold">&times;</button>
                         </div>
                         <div className="space-y-4 max-h-[70vh] overflow-y-auto no-scrollbar">
-                            {/* FIX 1: Grams/Units Toggle */}
                             <div className="bg-slate-100 p-1 rounded-xl flex mb-2">
                                 {['g', 'unit'].map(m => (
                                     <button key={m} onClick={() => setEditFood({...editFood, measure: m})} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${editFood.measure === m ? 'bg-white shadow text-pink-500' : 'text-slate-400'}`}>{m === 'g' ? 'Grams (Weight)' : 'Units (Qty)'}</button>
@@ -606,13 +585,11 @@ function App() {
                             <input className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none text-xs" value={editFood.name} onChange={e => setEditFood({...editFood, name: e.target.value})} placeholder="Food Name" />
                             
                             <div>
-                                {/* FIX 1: Dynamic Label */}
                                 <label className="text-[10px] font-black uppercase text-slate-400 ml-2">{editFood.measure === 'g' ? 'Weight (g)' : 'Quantity'}</label>
                                 <input type="number" className="w-full bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none text-center" value={editFood.weight} onFocus={e => handleFocus(e, v => setEditFood({...editFood, weight: Number(v)}))} onChange={e => setEditFood({...editFood, weight: Number(e.target.value)})} />
                             </div>
 
                             <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                                {/* FIX 1: Fixed Macro Label */}
                                 <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Macros for this entire entry</p>
                                 <div className="grid grid-cols-4 gap-2">
                                     {['carbs', 'protein', 'fat', 'fiber'].map(m => (
@@ -634,7 +611,6 @@ function App() {
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick={() => setFinishModalOpen(false)}>
                     <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10" onClick={e => e.stopPropagation()}>
                         <h2 className="text-xl font-black text-slate-800 uppercase mb-6">Almost Done!</h2>
-                        {/* FIX 2: Duration Input Moved Here */}
                         <div className="mb-6">
                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Total Duration (Minutes)</label>
                             <input type="number" className="w-full bg-slate-100 p-4 rounded-2xl font-black text-3xl text-center outline-none focus:ring-2 ring-pink-300" value={workoutDuration} onFocus={e => handleFocus(e, setWorkoutDuration)} onChange={e => setWorkoutDuration(e.target.value)} />

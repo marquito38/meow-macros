@@ -20,12 +20,6 @@ body {
 }
 .animate-swat { animation: swat 1s ease-in-out forwards; }
 
-@keyframes bounce-cat { 
-    0%, 100% { transform: translateY(0); } 
-    50% { transform: translateY(-10px); } 
-}
-.animate-bounce-cat { animation: bounce-cat 2s infinite; }
-
 @keyframes pop-in {
     0% { transform: scale(0.8); opacity: 0; }
     100% { transform: scale(1); opacity: 1; }
@@ -38,13 +32,17 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
-/* FIX 3: CSS Grid for Fitness Logger */
-/* Ensures headers and inputs align perfectly */
-.fitness-grid {
+/* FIX: Strict Fitness Grid Alignment */
+.workout-grid {
     display: grid;
-    grid-template-columns: 0.5fr 1fr 1fr 1fr;
-    gap: 0.5rem;
+    grid-template-columns: 40px 1fr 1fr 60px; /* User Defined Columns */
+    gap: 0.25rem; /* Tight gap for small screens */
     align-items: center;
+    width: 100%;
+}
+
+.workout-grid input, .workout-grid select, .workout-grid div {
+    font-size: 0.75rem; /* Compact font */
 }
 
 /* Mobile safe area padding */
