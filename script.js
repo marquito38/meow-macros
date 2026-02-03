@@ -135,28 +135,28 @@ function App() {
     const fileInputRef = useRef(null);
     const timerRef = useRef(null);
 
-    // FIX 2: Sticky "0" via Event Delegation
+    // FIX 3: Sticky "0" via Event Delegation with Capture
     useEffect(() => {
-        const handleFocusIn = (e) => {
+        const handleFocus = (e) => {
             // Check if it's a number input and value is exactly '0'
             if (e.target.tagName === 'INPUT' && e.target.type === 'number' && e.target.value === '0') {
                 e.target.value = '';
             }
         };
-        const handleFocusOut = (e) => {
+        const handleBlur = (e) => {
             // Restore '0' if left empty
             if (e.target.tagName === 'INPUT' && e.target.type === 'number' && e.target.value === '') {
                 e.target.value = '0';
             }
         };
 
-        // Attach to document to catch ALL inputs (even inside Modals)
-        document.addEventListener('focusin', handleFocusIn);
-        document.addEventListener('focusout', handleFocusOut);
+        // Attach to document with capture: true to catch all inputs, including dynamically created ones
+        document.addEventListener('focus', handleFocus, true);
+        document.addEventListener('blur', handleBlur, true);
         
         return () => {
-            document.removeEventListener('focusin', handleFocusIn);
-            document.removeEventListener('focusout', handleFocusOut);
+            document.removeEventListener('focus', handleFocus, true);
+            document.removeEventListener('blur', handleBlur, true);
         };
     }, []);
 
@@ -319,7 +319,7 @@ function App() {
         }
     };
 
-    // FIX 3: Safe Charts (Prevent White Screen Crash)
+    // FIX 2: Safe Charts with Guard Clause
     useEffect(() => {
         if (view === 'trends') {
             try {
@@ -407,8 +407,8 @@ function App() {
         <div className="space-y-6 pb-20 safe-pb">
             <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-2">
-                    {/* FIX 1: Reliable Nyan Cat Link */}
-                    <img src="https://media.tenor.com/images/36584033230a1122a6136a87796d13cb/tenor.gif" alt="Nyan Cat" className="w-10 h-10 object-contain rounded-full border border-pink-200" />
+                    {/* FIX 1: Reliable Nyan Cat Link (Giphy) */}
+                    <img src="https://media.giphy.com/media/sIIhZliB2McAo/giphy.gif" alt="Nyan Cat" className="w-10 h-10 object-contain rounded-full border border-pink-200" />
                     <h1 className="text-2xl font-black text-pink-500 tracking-tight">Meow Macros</h1>
                 </div>
             </div>
@@ -482,7 +482,6 @@ function App() {
                     const currentSets = workoutInputs[ex.name] || Array(ex.sets).fill({weight:0, reps:0, difficulty:'😼'});
                     
                     return (
-                        /* FIX 4: Reduced Padding (p-2) to fit mobile screens better */
                         <div key={idx} className="bg-white p-2 rounded-3xl shadow-sm border border-slate-100">
                             <div className="flex justify-between items-center mb-3 px-2">
                                 <div className="flex-1">
@@ -528,6 +527,63 @@ function App() {
             <button onClick={() => setFinishModalOpen(true)} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2 sticky bottom-24 z-20"><span className="material-icons-round text-xl">check_circle</span> Finish Workout</button>
         </div>
     );
+
+    const renderTrends = () => {
+        // FIX 2: Guard Clause for Empty Data
+        const hasHistory = Object.keys(data.history).length > 0;
+        const hasFitness = Object.keys(data.fitnessHistory).length > 0;
+        
+        if (!hasHistory && !hasFitness) {
+             return (
+                <div className="pb-20 safe-pb space-y-6 flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+                    <h2 className="text-2xl font-black text-slate-700">Trends & History</h2>
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-pink-100">
+                        <p className="text-slate-500 font-bold mb-2">No data yet! 😿</p>
+                        <p className="text-sm text-slate-400">Start logging food or workouts to see your charts.</p>
+                    </div>
+                </div>
+             );
+        }
+
+        const pastWorkouts = Object.entries(data.fitnessHistory)
+            .flatMap(([d, logs]) => logs.map(l => ({ date: d, ...l })))
+            .sort((a, b) => b.id - a.id)
+            .slice(0, 10);
+
+        return (
+            <div className="pb-20 safe-pb space-y-6">
+                <h2 className="text-2xl font-black text-slate-700">Trends & History</h2>
+                <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
+                    <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Calories: In vs Out</h3>
+                    <div className="h-52"><canvas id="calChart"></canvas></div>
+                </div>
+                <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
+                    <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Volume Lifted</h3>
+                    <div className="h-52"><canvas id="volChart"></canvas></div>
+                </div>
+                <div className="space-y-3">
+                    <h3 className="font-bold text-slate-700">Workout Log</h3>
+                    {pastWorkouts.length === 0 ? <p className="text-xs text-slate-400">No workouts yet.</p> : pastWorkouts.map(w => {
+                        let vol = 0;
+                        Object.values(w.exercises || {}).forEach(sets => sets.forEach(s => vol += (s.weight||0)*(s.reps||0)));
+                        return (
+                            <div key={w.id} className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-400">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-bold text-slate-700 text-sm">Workout {w.routine} <span className="text-xs font-normal text-slate-400">({w.date})</span></p>
+                                        <p className="text-xs font-bold text-pink-500">{w.calories} cal</p>
+                                        <p className="text-[10px] text-slate-500 mt-1">Total Volume: <span className="font-black">{vol.toLocaleString()} lbs</span></p>
+                                        <p className="text-[10px] text-indigo-500 italic">That's heavy! Like {getVolumeAnimal(vol)}</p>
+                                    </div>
+                                    <button onClick={() => handleDeleteWorkout(w.id, w.date)} className="text-slate-300 hover:text-red-400 p-2"><span className="material-icons-round text-lg">delete</span></button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
 
     const renderLibrary = () => (
         <div className="pb-20 safe-pb">
