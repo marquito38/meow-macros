@@ -46,11 +46,8 @@ const MOTIVATION_QUOTES = ["Crushed it! 🐾", "Paws-itively Strong! 💪", "Fel
 
 // --- HELPERS ---
 
-// CRITICAL FIX: Timezone-aware date string (YYYY-MM-DD)
-// Prevents app from switching to "tomorrow" based on UTC time
 const getLocalYMD = () => {
     const now = new Date();
-    // Shift time by timezone offset to get correct local date components
     const local = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
     return local.toISOString().split('T')[0];
 };
@@ -116,18 +113,15 @@ const ProgressBar = ({ current, max, color, label, reverse = false }) => {
 
 // --- MAIN APP ---
 function App() {
-    // State - Initialized with Local Date (Fix for early wipe)
     const [view, setView] = useState('home');
     const [data, setData] = useState({ history: {}, fitnessHistory: {}, library: STARTER_LIBRARY, settings: { apiKey: '' } });
     const [date, setDate] = useState(getLocalYMD());
     
-    // UI State
     const [modalOpen, setModalOpen] = useState(false);
     const [finishModalOpen, setFinishModalOpen] = useState(false);
     const [successModalData, setSuccessModalData] = useState(null); 
     const [swatTrigger, setSwatTrigger] = useState(false);
     
-    // Inputs
     const [editFood, setEditFood] = useState({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack', measure: 'g' });
     const [librarySearch, setLibrarySearch] = useState('');
     const [isNew, setIsNew] = useState(true);
@@ -136,13 +130,36 @@ function App() {
     const [workoutInputs, setWorkoutInputs] = useState({});
     const [timers, setTimers] = useState({});
 
-    // Refs
     const calorieChartRef = useRef(null);
     const volumeChartRef = useRef(null);
     const fileInputRef = useRef(null);
     const timerRef = useRef(null);
 
-    // CRITICAL: Check for date rollover on mount and focus
+    // FIX 2: Sticky "0" via Event Delegation
+    useEffect(() => {
+        const handleFocusIn = (e) => {
+            // Check if it's a number input and value is exactly '0'
+            if (e.target.tagName === 'INPUT' && e.target.type === 'number' && e.target.value === '0') {
+                e.target.value = '';
+            }
+        };
+        const handleFocusOut = (e) => {
+            // Restore '0' if left empty
+            if (e.target.tagName === 'INPUT' && e.target.type === 'number' && e.target.value === '') {
+                e.target.value = '0';
+            }
+        };
+
+        // Attach to document to catch ALL inputs (even inside Modals)
+        document.addEventListener('focusin', handleFocusIn);
+        document.addEventListener('focusout', handleFocusOut);
+        
+        return () => {
+            document.removeEventListener('focusin', handleFocusIn);
+            document.removeEventListener('focusout', handleFocusOut);
+        };
+    }, []);
+
     useEffect(() => {
         const checkDateReset = () => {
             const currentLocal = getLocalYMD();
@@ -151,16 +168,11 @@ function App() {
                 setDate(currentLocal);
             }
         };
-
-        // Check on mount
         checkDateReset();
-
-        // Check when window regains focus (e.g. opening app next morning)
         window.addEventListener('focus', checkDateReset);
         return () => window.removeEventListener('focus', checkDateReset);
     }, [date]);
 
-    // Init Data
     useEffect(() => {
         const saved = localStorage.getItem('meow_data_v8');
         if (saved) {
@@ -173,29 +185,10 @@ function App() {
         }
     }, []);
 
-    // Persist Data
     useEffect(() => {
         localStorage.setItem('meow_data_v8', JSON.stringify(data));
     }, [data]);
 
-    // Sticky 0 Fix
-    useEffect(() => {
-        const applyStickyFix = () => {
-            document.querySelectorAll('input[type="number"]').forEach(input => {
-                input.removeEventListener('focus', handleStickyFocus);
-                input.removeEventListener('blur', handleStickyBlur);
-                input.addEventListener('focus', handleStickyFocus);
-                input.addEventListener('blur', handleStickyBlur);
-            });
-        };
-        const handleStickyFocus = function() { if (this.value === '0') this.value = ''; };
-        const handleStickyBlur = function() { if (this.value === '') this.value = '0'; };
-        applyStickyFix();
-        const interval = setInterval(applyStickyFix, 500);
-        return () => clearInterval(interval);
-    }, [modalOpen, finishModalOpen, view]);
-
-    // Timer Loop
     useEffect(() => {
         timerRef.current = setInterval(() => {
             setTimers(prev => {
@@ -208,7 +201,6 @@ function App() {
         return () => clearInterval(timerRef.current);
     }, []);
 
-    // Derived Data
     const todayLog = data.history[date] || [];
     const todayWorkouts = data.fitnessHistory[date] || [];
     const totals = todayLog.reduce((acc, item) => ({
@@ -219,9 +211,6 @@ function App() {
     const totalBurnedCals = todayWorkouts.reduce((acc, w) => acc + w.calories, 0);
     const adjustedCalorieGoal = GOALS.calories + totalBurnedCals;
     const remainingCals = adjustedCalorieGoal - totalEatenCals;
-
-    // Helpers
-    const handleFocus = (e, setter) => { if (Number(e.target.value) === 0) setter(''); };
 
     const formatLastLog = (exName) => {
         const dates = Object.keys(data.fitnessHistory).sort().reverse();
@@ -247,7 +236,6 @@ function App() {
         });
     };
 
-    // Actions
     const handleAddFood = () => {
         const newEntry = {
             id: Date.now(),
@@ -331,68 +319,83 @@ function App() {
         }
     };
 
-    // Charts
+    // FIX 3: Safe Charts (Prevent White Screen Crash)
     useEffect(() => {
         if (view === 'trends') {
-            if (calorieChartRef.current) calorieChartRef.current.destroy();
-            if (volumeChartRef.current) volumeChartRef.current.destroy();
+            try {
+                if (calorieChartRef.current) calorieChartRef.current.destroy();
+                if (volumeChartRef.current) volumeChartRef.current.destroy();
 
-            const labels = [];
-            const calsIn = [];
-            const calsOut = [];
-            const volumeData = [];
+                const labels = [];
+                const calsIn = [];
+                const calsOut = [];
+                const volumeData = [];
 
-            for (let i=6; i>=0; i--) {
-                const d = new Date();
-                d.setDate(d.getDate() - i);
-                const k = d.toISOString().split('T')[0];
-                labels.push(d.toLocaleDateString('en-US', {weekday:'short'}));
-                
-                const log = data.history[k] || [];
-                const fit = data.fitnessHistory[k] || [];
-                const dayIn = log.reduce((s, x) => s + calcCals(x.c,x.p,x.f), 0);
-                const dayBurn = fit.reduce((s, x) => s + x.calories, 0);
-                calsIn.push(dayIn);
-                calsOut.push(BASE_BMR + dayBurn);
+                for (let i=6; i>=0; i--) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    const k = d.toISOString().split('T')[0];
+                    labels.push(d.toLocaleDateString('en-US', {weekday:'short'}));
+                    
+                    const log = data.history[k] || [];
+                    const fit = data.fitnessHistory[k] || [];
+                    const dayIn = log.reduce((s, x) => s + calcCals(x.c,x.p,x.f), 0);
+                    const dayBurn = fit.reduce((s, x) => s + x.calories, 0);
+                    calsIn.push(dayIn);
+                    calsOut.push(BASE_BMR + dayBurn);
 
-                let dayVol = 0;
-                fit.forEach(sess => {
-                    if (sess.exercises) {
-                        Object.values(sess.exercises).forEach(sets => {
-                            sets.forEach(s => dayVol += (s.weight || 0) * (s.reps || 0));
-                        });
-                    }
-                });
-                volumeData.push(dayVol);
+                    let dayVol = 0;
+                    fit.forEach(sess => {
+                        if (sess.exercises) {
+                            Object.values(sess.exercises).forEach(sets => {
+                                if(Array.isArray(sets)) {
+                                    sets.forEach(s => dayVol += (s.weight || 0) * (s.reps || 0));
+                                }
+                            });
+                        }
+                    });
+                    volumeData.push(dayVol);
+                }
+
+                // Safety Check: Chart.js might fail if canvas is missing
+                const calCanvas = document.getElementById('calChart');
+                const volCanvas = document.getElementById('volChart');
+
+                if (calCanvas) {
+                    calorieChartRef.current = new Chart(calCanvas, {
+                        type: 'bar',
+                        data: {
+                            labels,
+                            datasets: [
+                                { label: 'In (Food)', data: calsIn, backgroundColor: '#f472b6', borderRadius: 4 },
+                                { label: 'Out (BMR+Work)', data: calsOut, backgroundColor: '#60a5fa', borderRadius: 4 }
+                            ]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: false }, y: { beginAtZero: true } } }
+                    });
+                }
+
+                if (volCanvas) {
+                    volumeChartRef.current = new Chart(volCanvas, {
+                        type: 'line',
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: 'Volume (lbs)',
+                                data: volumeData,
+                                borderColor: '#818cf8',
+                                backgroundColor: 'rgba(129, 140, 248, 0.2)',
+                                tension: 0.4,
+                                fill: true
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+            } catch (err) {
+                console.error("Chart Render Error:", err);
+                // Non-fatal error, charts just won't show
             }
-
-            calorieChartRef.current = new Chart(document.getElementById('calChart'), {
-                type: 'bar',
-                data: {
-                    labels,
-                    datasets: [
-                        { label: 'In (Food)', data: calsIn, backgroundColor: '#f472b6', borderRadius: 4 },
-                        { label: 'Out (BMR+Work)', data: calsOut, backgroundColor: '#60a5fa', borderRadius: 4 }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: false }, y: { beginAtZero: true } } }
-            });
-
-            volumeChartRef.current = new Chart(document.getElementById('volChart'), {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets: [{
-                        label: 'Volume (lbs)',
-                        data: volumeData,
-                        borderColor: '#818cf8',
-                        backgroundColor: 'rgba(129, 140, 248, 0.2)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
         }
         return () => {
             if (calorieChartRef.current) calorieChartRef.current.destroy();
@@ -400,12 +403,12 @@ function App() {
         };
     }, [view, data]);
 
-    // Renders
     const renderHome = () => (
         <div className="space-y-6 pb-20 safe-pb">
             <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-2">
-                    <img src="https://i.gifer.com/origin/36/36584033230a1122a6136a87796d13cb_w200.gif" alt="Nyan Cat" className="w-10 h-10 object-contain rounded-full border border-pink-200" />
+                    {/* FIX 1: Reliable Nyan Cat Link */}
+                    <img src="https://media.tenor.com/images/36584033230a1122a6136a87796d13cb/tenor.gif" alt="Nyan Cat" className="w-10 h-10 object-contain rounded-full border border-pink-200" />
                     <h1 className="text-2xl font-black text-pink-500 tracking-tight">Meow Macros</h1>
                 </div>
             </div>
@@ -479,8 +482,9 @@ function App() {
                     const currentSets = workoutInputs[ex.name] || Array(ex.sets).fill({weight:0, reps:0, difficulty:'😼'});
                     
                     return (
-                        <div key={idx} className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
-                            <div className="flex justify-between items-center mb-3">
+                        /* FIX 4: Reduced Padding (p-2) to fit mobile screens better */
+                        <div key={idx} className="bg-white p-2 rounded-3xl shadow-sm border border-slate-100">
+                            <div className="flex justify-between items-center mb-3 px-2">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-bold text-slate-800 text-sm">{ex.name}</h3>
@@ -510,8 +514,8 @@ function App() {
                                     return (
                                         <div key={setIdx} className="workout-grid">
                                             <div className="text-center font-black text-slate-300 text-xs">{setIdx + 1}</div>
-                                            <input type="number" className="bg-slate-50 p-2 rounded-xl text-center font-bold text-xs outline-none focus:ring-1 ring-pink-300" value={setData.weight} onFocus={e => handleFocus(e, v => updateSet('weight', v))} onChange={e => updateSet('weight', Number(e.target.value))} />
-                                            <input type="number" className="bg-slate-50 p-2 rounded-xl text-center font-bold text-xs outline-none focus:ring-1 ring-pink-300" value={setData.reps} onFocus={e => handleFocus(e, v => updateSet('reps', v))} onChange={e => updateSet('reps', Number(e.target.value))} />
+                                            <input type="number" className="bg-slate-50 p-2 rounded-xl text-center font-bold text-xs outline-none focus:ring-1 ring-pink-300" value={setData.weight} onChange={e => updateSet('weight', Number(e.target.value))} />
+                                            <input type="number" className="bg-slate-50 p-2 rounded-xl text-center font-bold text-xs outline-none focus:ring-1 ring-pink-300" value={setData.reps} onChange={e => updateSet('reps', Number(e.target.value))} />
                                             <select className="bg-slate-50 p-2 rounded-xl text-center text-xs appearance-none outline-none" value={setData.difficulty} onChange={e => updateSet('difficulty', e.target.value)}><option>😺</option><option>😼</option><option>🙀</option></select>
                                         </div>
                                     );
@@ -586,7 +590,7 @@ function App() {
                             
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-400 ml-2">{editFood.measure === 'g' ? 'Weight (g)' : 'Quantity'}</label>
-                                <input type="number" className="w-full bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none text-center" value={editFood.weight} onFocus={e => handleFocus(e, v => setEditFood({...editFood, weight: Number(v)}))} onChange={e => setEditFood({...editFood, weight: Number(e.target.value)})} />
+                                <input type="number" className="w-full bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none text-center" value={editFood.weight} onChange={e => setEditFood({...editFood, weight: Number(e.target.value)})} />
                             </div>
 
                             <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
@@ -595,7 +599,7 @@ function App() {
                                     {['carbs', 'protein', 'fat', 'fiber'].map(m => (
                                         <div key={m}>
                                             <label className="text-[8px] font-bold uppercase text-slate-400 block text-center mb-1">{m}</label>
-                                            <input type="number" className="w-full p-2 rounded-xl text-center font-bold text-xs" value={editFood[m]} onFocus={e => handleFocus(e, v => setEditFood({...editFood, [m]: Number(v)}))} onChange={e => setEditFood({...editFood, [m]: Number(e.target.value)})} />
+                                            <input type="number" className="w-full p-2 rounded-xl text-center font-bold text-xs" value={editFood[m]} onChange={e => setEditFood({...editFood, [m]: Number(e.target.value)})} />
                                         </div>
                                     ))}
                                 </div>
@@ -613,7 +617,7 @@ function App() {
                         <h2 className="text-xl font-black text-slate-800 uppercase mb-6">Almost Done!</h2>
                         <div className="mb-6">
                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Total Duration (Minutes)</label>
-                            <input type="number" className="w-full bg-slate-100 p-4 rounded-2xl font-black text-3xl text-center outline-none focus:ring-2 ring-pink-300" value={workoutDuration} onFocus={e => handleFocus(e, setWorkoutDuration)} onChange={e => setWorkoutDuration(e.target.value)} />
+                            <input type="number" className="w-full bg-slate-100 p-4 rounded-2xl font-black text-3xl text-center outline-none focus:ring-2 ring-pink-300" value={workoutDuration} onChange={e => setWorkoutDuration(e.target.value)} />
                         </div>
                         <button onClick={handleFinishWorkout} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2"><span className="material-icons-round text-xl">check_circle</span> Log Workout</button>
                     </div>

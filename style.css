@@ -1,11 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
 
+/* FIX 4: Global Box Sizing to prevent padding blowout */
+* {
+    box-sizing: border-box;
+}
+
 body { 
     font-family: 'Nunito', sans-serif; 
     -webkit-tap-highlight-color: transparent; 
     background-color: #FFF0F5; /* Lavender Blush */
     background-image: radial-gradient(#fbcfe8 1px, transparent 1px);
     background-size: 20px 20px;
+    margin: 0;
+    padding: 0;
 }
 
 .no-scrollbar::-webkit-scrollbar { 
@@ -20,6 +27,12 @@ body {
 }
 .animate-swat { animation: swat 1s ease-in-out forwards; }
 
+@keyframes bounce-cat { 
+    0%, 100% { transform: translateY(0); } 
+    50% { transform: translateY(-10px); } 
+}
+.animate-bounce-cat { animation: bounce-cat 2s infinite; }
+
 @keyframes pop-in {
     0% { transform: scale(0.8); opacity: 0; }
     100% { transform: scale(1); opacity: 1; }
@@ -32,16 +45,20 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
-/* FIX: Strict Fitness Grid Alignment */
+/* FIX 4: Tighter Grid & Font Size */
 .workout-grid {
     display: grid;
-    grid-template-columns: 40px 1fr 1fr 60px; /* User Defined Columns */
-    gap: 0.25rem; /* Tight gap for small screens */
+    /* 40px index, 1fr weight, 1fr reps, 60px diff */
+    grid-template-columns: 30px 1fr 1fr 50px; 
+    gap: 4px; /* Reduced gap */
     align-items: center;
     width: 100%;
 }
 
-.workout-grid input, .workout-grid select, .workout-grid div {
+/* Ensure inputs inside grid don't overflow */
+.workout-grid input, .workout-grid select {
+    width: 100%;
+    min-width: 0;
     font-size: 0.75rem; /* Compact font */
 }
 
