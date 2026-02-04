@@ -181,9 +181,17 @@ function App() {
     useEffect(() => {
         const saved = localStorage.getItem('meow_data_v10');
         if (saved) {
-            const parsed = JSON.parse(saved);
-            if (!parsed.fitnessHistory) parsed.fitnessHistory = {};
-            setData(parsed);
+            try {
+                const parsed = JSON.parse(saved);
+                // Safe guard: ensure objects exist
+                if (!parsed.history) parsed.history = {};
+                if (!parsed.fitnessHistory) parsed.fitnessHistory = {};
+                if (!parsed.library) parsed.library = STARTER_LIBRARY;
+                setData(parsed);
+            } catch (e) {
+                console.error("Data parse error", e);
+                // Fallback to defaults or v9 if needed, but setData is already defaulted
+            }
         } else {
             const old = localStorage.getItem('meow_data_v9');
             if(old) setData(JSON.parse(old));
@@ -436,14 +444,18 @@ function App() {
                 const calsOut = [];
                 const volumeData = [];
 
+                // Use robust accessors
+                const history = data.history || {};
+                const fitnessHistory = data.fitnessHistory || {};
+
                 for (let i=6; i>=0; i--) {
                     const d = new Date();
                     d.setDate(d.getDate() - i);
                     const k = d.toISOString().split('T')[0];
                     labels.push(d.toLocaleDateString('en-US', {weekday:'short'}));
                     
-                    const log = data.history[k] || [];
-                    const fit = data.fitnessHistory[k] || [];
+                    const log = history[k] || [];
+                    const fit = fitnessHistory[k] || [];
                     const dayIn = log.reduce((s, x) => s + calcCals(x.c,x.p,x.f), 0);
                     const dayBurn = fit.reduce((s, x) => s + x.calories, 0);
                     calsIn.push(dayIn);
