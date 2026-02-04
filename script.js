@@ -179,7 +179,7 @@ function App() {
 
     // Data Persistence
     useEffect(() => {
-        const saved = localStorage.getItem('meow_data_v10'); // Version bump for 2.5
+        const saved = localStorage.getItem('meow_data_v10');
         if (saved) {
             const parsed = JSON.parse(saved);
             if (!parsed.fitnessHistory) parsed.fitnessHistory = {};
@@ -325,31 +325,63 @@ function App() {
         setModalOpen(true);
     };
 
-    // FEATURE 2.5: Handle Edit Library Source
+    // FEATURE 2.5: Handle Edit Library Source (Refactored for Smart Serving Size)
     const handleStartEditLibrary = () => {
-        setBaseEditValues({ ...selectedBaseItem });
+        // Initialize with default serving size 100 for grams or 1 for units
+        const isUnit = selectedBaseItem.measure === 'unit';
+        setBaseEditValues({
+            ...selectedBaseItem,
+            measureType: isUnit ? 'unit' : 'g',
+            servingSize: isUnit ? 1 : 100
+        });
         setIsLibraryEditMode(true);
     };
 
     const handleSaveLibraryEdit = () => {
-        // 1. Update the item in the Library
-        const updatedItem = { ...baseEditValues };
-        const newLib = data.library.map(i => i.id === updatedItem.id ? updatedItem : i);
+        let updatedItem = { ...selectedBaseItem, name: baseEditValues.name };
         
+        if (baseEditValues.measureType === 'unit') {
+            updatedItem = {
+                ...updatedItem,
+                measure: 'unit',
+                carbs: Number(baseEditValues.carbs),
+                protein: Number(baseEditValues.protein),
+                fat: Number(baseEditValues.fat),
+                fiber: Number(baseEditValues.fiber)
+            };
+        } else {
+            // Grams: Normalize to 100g base for internal storage
+            // Formula: (InputMacro / ServingSize) * 100
+            const serving = Number(baseEditValues.servingSize) || 100;
+            const ratio = 100 / serving;
+            
+            updatedItem = {
+                ...updatedItem,
+                measure: 'g',
+                carbs: parseFloat((Number(baseEditValues.carbs) * ratio).toFixed(1)),
+                protein: parseFloat((Number(baseEditValues.protein) * ratio).toFixed(1)),
+                fat: parseFloat((Number(baseEditValues.fat) * ratio).toFixed(1)),
+                fiber: parseFloat((Number(baseEditValues.fiber) * ratio).toFixed(1))
+            };
+        }
+
+        // 1. Update Library
+        const newLib = data.library.map(i => i.id === updatedItem.id ? updatedItem : i);
         setData({...data, library: newLib});
         setSelectedBaseItem(updatedItem); // Update base reference
 
-        // 2. Recalculate current Calculator view based on new base values
+        // 2. Recalculate Calculator View (Standard Mode)
         const baseAmount = updatedItem.measure === 'unit' ? 1 : 100;
-        const ratio = editFood.weight / baseAmount;
+        const calcRatio = editFood.weight / baseAmount;
         
         setEditFood({
             ...editFood,
-            name: updatedItem.name, // Update Name if changed
-            carbs: parseFloat((updatedItem.carbs * ratio).toFixed(1)),
-            protein: parseFloat((updatedItem.protein * ratio).toFixed(1)),
-            fat: parseFloat((updatedItem.fat * ratio).toFixed(1)),
-            fiber: parseFloat((updatedItem.fiber * ratio).toFixed(1))
+            name: updatedItem.name,
+            carbs: parseFloat((updatedItem.carbs * calcRatio).toFixed(1)),
+            protein: parseFloat((updatedItem.protein * calcRatio).toFixed(1)),
+            fat: parseFloat((updatedItem.fat * calcRatio).toFixed(1)),
+            fiber: parseFloat((updatedItem.fiber * calcRatio).toFixed(1)),
+            measure: updatedItem.measure
         });
 
         // 3. Exit Edit Mode
@@ -611,61 +643,6 @@ function App() {
         </div>
     );
 
-    const renderTrends = () => {
-        const hasHistory = Object.keys(data.history).length > 0;
-        const hasFitness = Object.keys(data.fitnessHistory).length > 0;
-        
-        if (!hasHistory && !hasFitness) {
-             return (
-                <div className="pb-20 safe-pb space-y-6 flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-                    <h2 className="text-2xl font-black text-slate-700">Trends & History</h2>
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-pink-100">
-                        <p className="text-slate-500 font-bold mb-2">No data yet! 😿</p>
-                        <p className="text-sm text-slate-400">Start logging food or workouts to see your charts.</p>
-                    </div>
-                </div>
-             );
-        }
-
-        const pastWorkouts = Object.entries(data.fitnessHistory)
-            .flatMap(([d, logs]) => logs.map(l => ({ date: d, ...l })))
-            .sort((a, b) => b.id - a.id)
-            .slice(0, 10);
-
-        return (
-            <div className="pb-20 safe-pb space-y-6">
-                <h2 className="text-2xl font-black text-slate-700">Trends & History</h2>
-                <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
-                    <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Calories: In vs Out</h3>
-                    <div className="h-52"><canvas id="calChart"></canvas></div>
-                </div>
-                <div className="bg-white p-4 rounded-3xl shadow-sm h-64">
-                    <h3 className="text-xs font-black text-slate-400 uppercase mb-2">Volume Lifted</h3>
-                    <div className="h-52"><canvas id="volChart"></canvas></div>
-                </div>
-                <div className="space-y-3">
-                    <h3 className="font-bold text-slate-700">Workout Log</h3>
-                    {pastWorkouts.length === 0 ? <p className="text-xs text-slate-400">No workouts yet.</p> : pastWorkouts.map(w => {
-                        let vol = 0;
-                        Object.values(w.exercises || {}).forEach(sets => sets.forEach(s => vol += (s.weight||0)*(s.reps||0)));
-                        return (
-                            <div key={w.id} onClick={() => setViewHistoryItem(w)} className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-400 active:scale-95 transition-transform cursor-pointer">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-bold text-slate-700 text-sm">{WORKOUTS[w.routine].name} <span className="text-xs font-normal text-slate-400">({w.date})</span></p>
-                                        <p className="text-xs font-bold text-pink-500">{w.calories} cal</p>
-                                        <p className="text-[10px] text-slate-500 mt-1">Total Volume: <span className="font-black">{vol.toLocaleString()} lbs</span></p>
-                                    </div>
-                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteWorkout(w.id, w.date); }} className="text-slate-300 hover:text-red-400 p-2"><span className="material-icons-round text-lg">delete</span></button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
-
     const renderLibrary = () => (
         <div className="pb-20 safe-pb">
             <div className="sticky top-0 bg-[#FFF0F5] z-30 pb-4 pt-2">
@@ -735,18 +712,35 @@ function App() {
                             <div className="space-y-4">
                                 <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
                                     <p className="text-xs font-bold text-amber-600 flex items-center gap-1">
-                                        <span className="material-icons-round text-sm">warning</span> 
-                                        Editing Base Values (per 100g / 1 Unit)
+                                        <span className="material-icons-round text-sm">auto_fix_high</span> 
+                                        Smart Editor: Enter values from Nutrition Label
                                     </p>
                                 </div>
                                 
-                                <div>
-                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Food Name</label>
-                                    <input className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none text-sm" value={baseEditValues.name} onChange={e => setBaseEditValues({...baseEditValues, name: e.target.value})} />
+                                <div className="flex gap-2">
+                                    <div className="flex-1">
+                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Food Name</label>
+                                        <input className="w-full bg-slate-50 p-3 rounded-2xl font-bold outline-none text-sm" value={baseEditValues.name} onChange={e => setBaseEditValues({...baseEditValues, name: e.target.value})} />
+                                    </div>
+                                    <div className="w-1/3">
+                                         <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Type</label>
+                                         <button onClick={() => setBaseEditValues({...baseEditValues, measureType: baseEditValues.measureType === 'g' ? 'unit' : 'g'})} className="w-full bg-slate-100 p-3 rounded-2xl font-bold text-xs uppercase text-slate-600 border border-slate-200">
+                                            {baseEditValues.measureType === 'g' ? 'Grams' : 'Units'}
+                                         </button>
+                                    </div>
                                 </div>
 
+                                {baseEditValues.measureType === 'g' && (
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Serving Size (g)</label>
+                                        <input type="number" className="w-full bg-slate-50 p-3 rounded-2xl font-bold outline-none text-center" value={baseEditValues.servingSize} onChange={e => setBaseEditValues({...baseEditValues, servingSize: Number(e.target.value)})} />
+                                    </div>
+                                )}
+
                                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                                    <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Base Macros (per 100g / 1 Unit)</p>
+                                    <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">
+                                        Macros in {baseEditValues.measureType === 'g' ? `${baseEditValues.servingSize}g` : '1 Unit'}
+                                    </p>
                                     <div className="grid grid-cols-4 gap-2">
                                         {['carbs', 'protein', 'fat', 'fiber'].map(m => (
                                             <div key={m}>
@@ -756,7 +750,7 @@ function App() {
                                         ))}
                                     </div>
                                 </div>
-                                <button onClick={handleSaveLibraryEdit} className="w-full bg-amber-500 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-amber-600 active:scale-95 transition-transform">Save Changes 💾</button>
+                                <button onClick={handleSaveLibraryEdit} className="w-full bg-amber-500 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-amber-600 active:scale-95 transition-transform">Save & Normalize 💾</button>
                             </div>
                         ) : (
                             <div className="space-y-4 max-h-[70vh] overflow-y-auto no-scrollbar">
