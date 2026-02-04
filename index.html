@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Meow Macros: Cyber-Nyan Edition</title>
+    <title>Meow Macros: Kawaii Edition</title>
     
     <!-- React & DOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -14,14 +14,32 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        nunito: ['Nunito', 'sans-serif'],
+                    },
+                    colors: {
+                        'kawaii-blue': '#a5d8ff',
+                        'kawaii-blue-dark': '#74c0fc',
+                        'kawaii-peach': '#ffc9c9',
+                        'kawaii-yellow': '#ffec99',
+                        'kawaii-mint': '#b2f2bb',
+                    }
+                }
+            }
+        }
+    </script>
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- Google Fonts: 8-Bit & Terminal -->
+    <!-- Google Fonts: Nunito (Rounded & Cute) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
@@ -29,7 +47,7 @@
     <!-- Custom Styles -->
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-[#1a1a2e] text-cyan-400 selection:bg-pink-500 selection:text-white overflow-x-hidden">
+<body class="bg-blue-50 text-slate-600 font-nunito overflow-x-hidden selection:bg-blue-200 selection:text-blue-700">
     <div id="root"></div>
     
     <!-- App Logic -->
