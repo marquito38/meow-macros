@@ -124,16 +124,11 @@ function App() {
     const [swatTrigger, setSwatTrigger] = useState(false);
     const [viewHistoryItem, setViewHistoryItem] = useState(null);
     
-    // FEATURE 3.0: Settings & AI State
-    const [settingsOpen, setSettingsOpen] = useState(false);
-    const [apiKey, setApiKey] = useState(localStorage.getItem('geminiApiKey') || '');
-    const [isScanning, setIsScanning] = useState(false);
-    
     // Inputs
     const [editFood, setEditFood] = useState({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack', measure: 'g' });
     const [selectedBaseItem, setSelectedBaseItem] = useState(null);
 
-    // FEATURE 2.5: Edit Library Mode
+    // FEATURE 2.5: Edit Library Mode (PRESERVED)
     const [isLibraryEditMode, setIsLibraryEditMode] = useState(false);
     const [baseEditValues, setBaseEditValues] = useState({});
 
@@ -147,7 +142,6 @@ function App() {
     const calorieChartRef = useRef(null);
     const volumeChartRef = useRef(null);
     const fileInputRef = useRef(null);
-    const modalFileInputRef = useRef(null); // Separate ref for modal scan
     const timerRef = useRef(null);
 
     // Event Delegation for Sticky "0"
@@ -196,7 +190,6 @@ function App() {
                 setData(parsed);
             } catch (e) {
                 console.error("Data parse error", e);
-                // Fallback to defaults or v9 if needed, but setData is already defaulted
             }
         } else {
             const old = localStorage.getItem('meow_data_v9');
@@ -232,92 +225,6 @@ function App() {
     const totalBurnedCals = todayWorkouts.reduce((acc, w) => acc + w.calories, 0);
     const adjustedCalorieGoal = GOALS.calories + totalBurnedCals;
     const remainingCals = adjustedCalorieGoal - totalEatenCals;
-
-    // --- FEATURE 3.0: AI LOGIC ---
-    const handleSaveSettings = () => {
-        localStorage.setItem('geminiApiKey', apiKey);
-        setSettingsOpen(false);
-    };
-
-    const handleImageSelect = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        // Reset file input so same file triggers change again if needed
-        e.target.value = '';
-
-        if (!apiKey) { 
-            alert("Please set your API Key in Settings first! 🔑"); 
-            setSettingsOpen(true);
-            return; 
-        }
-
-        setIsScanning(true);
-        
-        try {
-            // 1. Convert to Base64
-            const base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = error => reject(error);
-            });
-
-            // 2. Call Gemini API
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: "Analyze this food image. Estimate the macros. Return ONLY raw JSON (no markdown) with these keys: name, calories, protein, carbs, fat, quantity, unit (use 'g' or 'unit'). Estimate a reasonable serving size." },
-                            { inline_data: { mime_type: file.type, data: base64 } }
-                        ]
-                    }]
-                })
-            });
-
-            const apiData = await response.json();
-            
-            if (apiData.error) {
-                throw new Error(apiData.error.message);
-            }
-
-            // 3. Parse Response
-            const text = apiData.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!text) throw new Error("No analysis returned");
-
-            const cleanJson = text.replace(/```json|```/g, '').trim();
-            const result = JSON.parse(cleanJson);
-
-            // 4. Auto-Fill Form
-            setEditFood({
-                 name: result.name || "AI Food Scan",
-                 weight: Number(result.quantity) || 100,
-                 measure: result.unit === 'unit' ? 'unit' : 'g',
-                 carbs: Number(result.carbs) || 0,
-                 protein: Number(result.protein) || 0,
-                 fat: Number(result.fat) || 0,
-                 fiber: 0, // AI usually guesses this poorly, safe default
-                 category: 'Snack'
-            });
-            
-            // Ensure we are in manual mode (Calculator Mode) not Library Mode
-            setSelectedBaseItem(null); 
-            setIsNew(true);
-            
-            // If called from Home screen, ensure modal is open
-            setModalOpen(true);
-
-        } catch (err) {
-            console.error("AI Scan failed", err);
-            alert("AI Scan failed. Check your API Key or try a clearer photo.");
-        } finally {
-            setIsScanning(false);
-        }
-    };
-
-    // --- STANDARD APP LOGIC ---
 
     const formatLastLog = (exName) => {
         const dates = Object.keys(data.fitnessHistory).sort().reverse();
@@ -723,10 +630,6 @@ function App() {
                     />
                     <h1 className="text-2xl font-black text-pink-500 tracking-tight">Meow Macros</h1>
                 </div>
-                {/* FEATURE 3.0: Settings Button */}
-                <button onClick={() => setSettingsOpen(true)} className="bg-white p-2 rounded-xl shadow-sm hover:text-pink-500 transition-colors">
-                    <span className="material-icons-round text-xl text-slate-400">settings</span>
-                </button>
             </div>
 
             <div className="glass-panel p-5 rounded-3xl shadow-lg border-b-4 border-pink-200 relative overflow-hidden">
@@ -754,8 +657,8 @@ function App() {
 
             <div className="grid grid-cols-2 gap-4">
                 <button onClick={() => openAddFood()} className="bg-teal-500 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"><span className="material-icons-round text-2xl">add_circle</span> Add Food</button>
-                <button onClick={() => modalFileInputRef.current.click()} className="bg-indigo-500 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"><span className="material-icons-round text-2xl">photo_camera</span> AI Scan</button>
-                {/* Home screen scanner uses shared ref/logic */}
+                <button onClick={() => fileInputRef.current.click()} className="bg-indigo-500 text-white p-4 rounded-2xl shadow-md font-bold flex flex-col items-center gap-2 active:scale-95 transition-transform"><span className="material-icons-round text-2xl">photo_camera</span> AI Scan</button>
+                <input type="file" ref={fileInputRef} className="hidden" />
             </div>
 
             <div className="space-y-2">
@@ -875,16 +778,6 @@ function App() {
             <CatPawSwat trigger={swatTrigger} />
             <SuccessModal isOpen={!!successModalData} onClose={() => setSuccessModalData(null)} {...successModalData} />
             
-            {/* FEATURE 3.0: Shared Hidden File Input for AI Scan */}
-            <input 
-                type="file" 
-                ref={modalFileInputRef} 
-                className="hidden" 
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageSelect}
-            />
-
             {/* Views */}
             {view === 'home' && renderHome()}
             {view === 'fitness' && renderFitness()}
@@ -899,33 +792,6 @@ function App() {
                 <button onClick={() => setView('library')} className={`p-3 rounded-full transition-all ${view==='library'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><span className="material-icons-round text-xl">menu_book</span></button>
                 <button onClick={() => setView('trends')} className={`p-3 rounded-full transition-all ${view==='trends'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><span className="material-icons-round text-xl">insights</span></button>
             </nav>
-
-            {/* FEATURE 3.0: Settings Modal */}
-            {settingsOpen && (
-                <div className="fixed inset-0 z-[80] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSettingsOpen(false)}>
-                    <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-black text-slate-800 uppercase">The Vault 🔐</h2>
-                            <button onClick={() => setSettingsOpen(false)} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center font-bold">&times;</button>
-                        </div>
-                        <div className="space-y-4">
-                            <p className="text-sm text-slate-500">Enter your Gemini API Key to unlock AI features.</p>
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">API Key</label>
-                                <input 
-                                    type="password" 
-                                    className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none text-sm border border-slate-200 focus:border-pink-300 focus:ring-4 ring-pink-100 transition-all" 
-                                    placeholder="sk-..." 
-                                    value={apiKey} 
-                                    onChange={e => setApiKey(e.target.value)} 
-                                />
-                            </div>
-                            <button onClick={handleSaveSettings} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform">Save Key</button>
-                            <p className="text-[10px] text-center text-slate-300 mt-2">Key is stored locally on your device.</p>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Add Food / Edit Library Modal */}
             {modalOpen && (
@@ -995,25 +861,6 @@ function App() {
                             </div>
                         ) : (
                             <div className="space-y-4 max-h-[70vh] overflow-y-auto no-scrollbar">
-                                {/* FEATURE 3.0: AI Scan Button */}
-                                <button 
-                                    onClick={() => modalFileInputRef.current.click()} 
-                                    className="w-full bg-indigo-500 text-white p-3 rounded-2xl shadow-md font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform mb-2"
-                                    disabled={isScanning}
-                                >
-                                    {isScanning ? (
-                                        <>
-                                            <span className="animate-spin material-icons-round text-xl">refresh</span>
-                                            Scanning...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="material-icons-round text-xl">auto_awesome</span>
-                                            AI Scan
-                                        </>
-                                    )}
-                                </button>
-
                                 <div className="bg-slate-100 p-1 rounded-xl flex mb-2">
                                     {['g', 'unit'].map(m => (
                                         <button key={m} onClick={() => setEditFood({...editFood, measure: m})} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${editFood.measure === m ? 'bg-white shadow text-pink-500' : 'text-slate-400'}`}>{m === 'g' ? 'Grams (Weight)' : 'Units (Qty)'}</button>
