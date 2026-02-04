@@ -3,28 +3,28 @@ const { useState, useEffect, useMemo, useRef } = React;
 // --- CONSTANTS ---
 const GOALS = { calories: 1645, carbs: 160, protein: 150, fat: 45, fiber: 38 };
 const USER_WEIGHT_KG = 73; 
-const LIFTING_MET = 6.0;
 const BASE_BMR = 1600;
 
+// UPDATE 2: Refined Workouts & Targets
 const WORKOUTS = {
     A: {
         name: "Workout A (Push)",
         exercises: [
-            { name: "DB Incline Bench", sets: 3 },
-            { name: "DB Goblet Squats", sets: 3 },
-            { name: "FT Lateral Raises", sets: 4 },
-            { name: "FT Tricep Ext", sets: 3 },
-            { name: "Jump Rope HIIT", sets: 1 }
+            { name: "DB Incline Bench", sets: 3, target: "3 x 6-8" },
+            { name: "DB Goblet Squats", sets: 3, target: "3 x 8-10" },
+            { name: "FT Lateral Raises", sets: 4, target: "4 x 12-15" },
+            { name: "FT Tricep Ext", sets: 3, target: "3 x 10-12" },
+            { name: "Jump Rope HIIT", sets: 1, target: "10 mins" }
         ]
     },
     B: {
         name: "Workout B (Pull)",
         exercises: [
-            { name: "DB Romanian DL", sets: 3 },
-            { name: "FT Row/Pulldown", sets: 3 },
-            { name: "DB Rear Delt Fly", sets: 3 },
-            { name: "DB Bicep Curls", sets: 3 },
-            { name: "Bike HIIT", sets: 1 }
+            { name: "DB Romanian DL", sets: 3, target: "3 x 6-8" },
+            { name: "FT Row/Pulldown", sets: 3, target: "3 x 8-10" },
+            { name: "DB Rear Delt Fly", sets: 3, target: "3 x 15" },
+            { name: "DB Bicep Curls", sets: 3, target: "3 x 10-12" },
+            { name: "Bike HIIT", sets: 1, target: "10 mins" }
         ]
     }
 };
@@ -117,12 +117,19 @@ function App() {
     const [data, setData] = useState({ history: {}, fitnessHistory: {}, library: STARTER_LIBRARY, settings: { apiKey: '' } });
     const [date, setDate] = useState(getLocalYMD());
     
+    // UI State
     const [modalOpen, setModalOpen] = useState(false);
     const [finishModalOpen, setFinishModalOpen] = useState(false);
     const [successModalData, setSuccessModalData] = useState(null); 
     const [swatTrigger, setSwatTrigger] = useState(false);
+    // UPDATE 3: View History Modal State
+    const [viewHistoryItem, setViewHistoryItem] = useState(null);
     
+    // Inputs
     const [editFood, setEditFood] = useState({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack', measure: 'g' });
+    // UPDATE 1: Store the base item for reactive math
+    const [selectedBaseItem, setSelectedBaseItem] = useState(null);
+
     const [librarySearch, setLibrarySearch] = useState('');
     const [isNew, setIsNew] = useState(true);
     const [activeRoutine, setActiveRoutine] = useState('A');
@@ -135,36 +142,31 @@ function App() {
     const fileInputRef = useRef(null);
     const timerRef = useRef(null);
 
-    // FIX 3: Sticky "0" via Event Delegation with Capture
+    // Event Delegation for Sticky "0"
     useEffect(() => {
         const handleFocus = (e) => {
-            // Check if it's a number input and value is exactly '0'
             if (e.target.tagName === 'INPUT' && e.target.type === 'number' && e.target.value === '0') {
                 e.target.value = '';
             }
         };
         const handleBlur = (e) => {
-            // Restore '0' if left empty
             if (e.target.tagName === 'INPUT' && e.target.type === 'number' && e.target.value === '') {
                 e.target.value = '0';
             }
         };
-
-        // Attach to document with capture: true to catch all inputs, including dynamically created ones
         document.addEventListener('focus', handleFocus, true);
         document.addEventListener('blur', handleBlur, true);
-        
         return () => {
             document.removeEventListener('focus', handleFocus, true);
             document.removeEventListener('blur', handleBlur, true);
         };
     }, []);
 
+    // Date Reset Check
     useEffect(() => {
         const checkDateReset = () => {
             const currentLocal = getLocalYMD();
             if (currentLocal !== date) {
-                console.log("Local date changed, updating view.");
                 setDate(currentLocal);
             }
         };
@@ -173,22 +175,24 @@ function App() {
         return () => window.removeEventListener('focus', checkDateReset);
     }, [date]);
 
+    // Data Persistence
     useEffect(() => {
-        const saved = localStorage.getItem('meow_data_v8');
+        const saved = localStorage.getItem('meow_data_v9'); // Version bump for 2.4
         if (saved) {
             const parsed = JSON.parse(saved);
             if (!parsed.fitnessHistory) parsed.fitnessHistory = {};
             setData(parsed);
         } else {
-            const old = localStorage.getItem('meow_data_v7');
+            const old = localStorage.getItem('meow_data_v8');
             if(old) setData(JSON.parse(old));
         }
     }, []);
 
     useEffect(() => {
-        localStorage.setItem('meow_data_v8', JSON.stringify(data));
+        localStorage.setItem('meow_data_v9', JSON.stringify(data));
     }, [data]);
 
+    // Timer Loop
     useEffect(() => {
         timerRef.current = setInterval(() => {
             setTimers(prev => {
@@ -201,6 +205,7 @@ function App() {
         return () => clearInterval(timerRef.current);
     }, []);
 
+    // Derived Calculations
     const todayLog = data.history[date] || [];
     const todayWorkouts = data.fitnessHistory[date] || [];
     const totals = todayLog.reduce((acc, item) => ({
@@ -236,6 +241,29 @@ function App() {
         });
     };
 
+    // UPDATE 1: Reactive Food Math Handler
+    const handleWeightChange = (val) => {
+        const newWeight = Number(val);
+        
+        // If we have a base item, recalculate macros
+        if (selectedBaseItem) {
+            const baseAmount = selectedBaseItem.measure === 'unit' ? 1 : 100;
+            const ratio = newWeight / baseAmount;
+            
+            setEditFood({
+                ...editFood,
+                weight: newWeight,
+                carbs: parseFloat((selectedBaseItem.carbs * ratio).toFixed(1)),
+                protein: parseFloat((selectedBaseItem.protein * ratio).toFixed(1)),
+                fat: parseFloat((selectedBaseItem.fat * ratio).toFixed(1)),
+                fiber: parseFloat((selectedBaseItem.fiber * ratio).toFixed(1))
+            });
+        } else {
+            // Manual entry mode, just update weight
+            setEditFood({ ...editFood, weight: newWeight });
+        }
+    };
+
     const handleAddFood = () => {
         const newEntry = {
             id: Date.now(),
@@ -249,10 +277,15 @@ function App() {
             category: editFood.category
         };
 
+        // UPDATE 1: Save last used amount to Library
         let newLib = [...data.library];
         const existingIdx = newLib.findIndex(i => i.name === editFood.name);
         if (existingIdx >= 0) {
-            newLib[existingIdx] = { ...newLib[existingIdx], lastUsed: Date.now() };
+            newLib[existingIdx] = { 
+                ...newLib[existingIdx], 
+                lastUsed: Date.now(),
+                lastAmount: editFood.weight // Memory feature
+            };
         } else {
             newLib.push({ ...editFood, id: Date.now().toString(), lastUsed: Date.now() });
         }
@@ -270,14 +303,27 @@ function App() {
 
     const openAddFood = (item = null) => {
         if (item) {
+            // UPDATE 1: Use Memory (lastAmount) if available, otherwise default
+            const startWeight = item.lastAmount || (item.measure === 'unit' ? 1 : 100);
+            
+            // Calculate initial macros based on startWeight
+            const baseAmount = item.measure === 'unit' ? 1 : 100;
+            const ratio = startWeight / baseAmount;
+
             setEditFood({ 
                 ...item, 
-                weight: item.measure === 'unit' ? 1 : 100,
+                weight: startWeight,
+                carbs: parseFloat((item.carbs * ratio).toFixed(1)),
+                protein: parseFloat((item.protein * ratio).toFixed(1)),
+                fat: parseFloat((item.fat * ratio).toFixed(1)),
+                fiber: parseFloat((item.fiber * ratio).toFixed(1)),
                 measure: item.measure || 'g' 
             });
+            setSelectedBaseItem(item); // Enable reactive math
             setIsNew(false);
         } else {
             setEditFood({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack', measure: 'g' });
+            setSelectedBaseItem(null); // Manual mode
             setIsNew(true);
         }
         setModalOpen(true);
@@ -285,7 +331,8 @@ function App() {
 
     const handleFinishWorkout = () => {
         const duration = parseInt(workoutDuration) || 0;
-        const burned = Math.round(LIFTING_MET * USER_WEIGHT_KG * (duration / 60));
+        // UPDATE 2: 6 Cals per Minute Logic
+        const burned = duration * 6;
         
         const workoutLog = {
             id: Date.now(),
@@ -319,7 +366,7 @@ function App() {
         }
     };
 
-    // FIX 2: Safe Charts with Guard Clause
+    // --- CHARTS ---
     useEffect(() => {
         if (view === 'trends') {
             try {
@@ -357,7 +404,6 @@ function App() {
                     volumeData.push(dayVol);
                 }
 
-                // Safety Check: Chart.js might fail if canvas is missing
                 const calCanvas = document.getElementById('calChart');
                 const volCanvas = document.getElementById('volChart');
 
@@ -394,7 +440,6 @@ function App() {
                 }
             } catch (err) {
                 console.error("Chart Render Error:", err);
-                // Non-fatal error, charts just won't show
             }
         }
         return () => {
@@ -407,14 +452,13 @@ function App() {
         <div className="space-y-6 pb-20 safe-pb">
             <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-2">
-                    {/* FIX 1: Reliable Nyan Cat Link (Giphy) - UPDATED V2.4 Styling */}
                     <img 
                         src="https://media.giphy.com/media/sIIhZliB2McAo/giphy.gif" 
                         alt="Nyan Cat" 
                         style={{
-                            height: '65px',           // Much bigger (was 40px)
-                            width: 'auto',            // Maintain aspect ratio
-                            borderRadius: '0',        // FORCE rectangle (removes circular clipping)
+                            height: '65px',
+                            width: 'auto',
+                            borderRadius: '0',
                             verticalAlign: 'middle', 
                             marginRight: '15px' 
                         }} 
@@ -480,7 +524,7 @@ function App() {
                 <h2 className="text-2xl font-black text-slate-700">Meow Muscles Pro 💪</h2>
                 <div className="flex bg-white p-1 rounded-2xl shadow-sm mt-4">
                     {['A', 'B'].map(r => (
-                        <button key={r} onClick={() => setActiveRoutine(r)} className={`flex-1 py-3 rounded-xl font-black text-xs uppercase transition-all ${activeRoutine === r ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400'}`}>Workout {r}</button>
+                        <button key={r} onClick={() => setActiveRoutine(r)} className={`flex-1 py-3 rounded-xl font-black text-xs uppercase transition-all ${activeRoutine === r ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400'}`}>{WORKOUTS[r].name}</button>
                     ))}
                 </div>
             </div>
@@ -499,7 +543,11 @@ function App() {
                                         <h3 className="font-bold text-slate-800 text-sm">{ex.name}</h3>
                                         {timeLeft > 0 && <span className="text-xs font-mono text-pink-500 font-bold animate-pulse">{timeLeft}s</span>}
                                     </div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[200px]">{lastSummary}</p>
+                                    {/* UPDATE 2: Targets */}
+                                    <div className="flex flex-col">
+                                        <p className="text-[10px] font-black text-pink-400 uppercase">Goal: {ex.target}</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[200px]">{lastSummary}</p>
+                                    </div>
                                 </div>
                                 <button onClick={() => setTimers(prev => ({...prev, [ex.name]: prev[ex.name]>0 ? 0 : 90}))} className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-colors ${timeLeft > 0 ? 'bg-pink-100 text-pink-500' : 'bg-slate-100 text-slate-500'}`}>{timeLeft > 0 ? 'Stop 🛑' : 'Cat Nap 😺'}</button>
                             </div>
@@ -539,7 +587,6 @@ function App() {
     );
 
     const renderTrends = () => {
-        // FIX 2: Guard Clause for Empty Data
         const hasHistory = Object.keys(data.history).length > 0;
         const hasFitness = Object.keys(data.fitnessHistory).length > 0;
         
@@ -577,15 +624,15 @@ function App() {
                         let vol = 0;
                         Object.values(w.exercises || {}).forEach(sets => sets.forEach(s => vol += (s.weight||0)*(s.reps||0)));
                         return (
-                            <div key={w.id} className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-400">
+                            // UPDATE 3: Clickable Log Item
+                            <div key={w.id} onClick={() => setViewHistoryItem(w)} className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-400 active:scale-95 transition-transform cursor-pointer">
                                 <div className="flex justify-between items-start">
                                     <div>
-                                        <p className="font-bold text-slate-700 text-sm">Workout {w.routine} <span className="text-xs font-normal text-slate-400">({w.date})</span></p>
+                                        <p className="font-bold text-slate-700 text-sm">{WORKOUTS[w.routine].name} <span className="text-xs font-normal text-slate-400">({w.date})</span></p>
                                         <p className="text-xs font-bold text-pink-500">{w.calories} cal</p>
                                         <p className="text-[10px] text-slate-500 mt-1">Total Volume: <span className="font-black">{vol.toLocaleString()} lbs</span></p>
-                                        <p className="text-[10px] text-indigo-500 italic">That's heavy! Like {getVolumeAnimal(vol)}</p>
                                     </div>
-                                    <button onClick={() => handleDeleteWorkout(w.id, w.date)} className="text-slate-300 hover:text-red-400 p-2"><span className="material-icons-round text-lg">delete</span></button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteWorkout(w.id, w.date); }} className="text-slate-300 hover:text-red-400 p-2"><span className="material-icons-round text-lg">delete</span></button>
                                 </div>
                             </div>
                         );
@@ -656,11 +703,12 @@ function App() {
                             
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-400 ml-2">{editFood.measure === 'g' ? 'Weight (g)' : 'Quantity'}</label>
-                                <input type="number" className="w-full bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none text-center" value={editFood.weight} onChange={e => setEditFood({...editFood, weight: Number(e.target.value)})} />
+                                {/* UPDATE 1: Reactive Weight Input */}
+                                <input type="number" className="w-full bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none text-center" value={editFood.weight} onChange={e => handleWeightChange(e.target.value)} />
                             </div>
 
                             <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                                <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Macros for this entire entry</p>
+                                <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Macros (Auto-Calc if Library Item)</p>
                                 <div className="grid grid-cols-4 gap-2">
                                     {['carbs', 'protein', 'fat', 'fiber'].map(m => (
                                         <div key={m}>
@@ -686,6 +734,45 @@ function App() {
                             <input type="number" className="w-full bg-slate-100 p-4 rounded-2xl font-black text-3xl text-center outline-none focus:ring-2 ring-pink-300" value={workoutDuration} onChange={e => setWorkoutDuration(e.target.value)} />
                         </div>
                         <button onClick={handleFinishWorkout} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-transform flex items-center justify-center gap-2"><span className="material-icons-round text-xl">check_circle</span> Log Workout</button>
+                    </div>
+                </div>
+            )}
+
+            {/* UPDATE 3: View History Modal (Read Only) */}
+            {viewHistoryItem && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewHistoryItem(null)}>
+                    <div className="bg-white w-full max-w-sm max-h-[80vh] overflow-y-auto rounded-[2rem] p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h2 className="text-lg font-black text-slate-800">{WORKOUTS[viewHistoryItem.routine]?.name || "Workout"}</h2>
+                                <p className="text-xs text-slate-400 font-bold">{viewHistoryItem.date} • {viewHistoryItem.duration} mins • {viewHistoryItem.calories} kcal</p>
+                            </div>
+                            <button onClick={() => setViewHistoryItem(null)} className="bg-slate-100 p-2 rounded-full"><span className="material-icons-round text-base">close</span></button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            {Object.entries(viewHistoryItem.exercises).map(([name, sets], idx) => (
+                                <div key={idx} className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                    <p className="font-bold text-slate-700 text-sm mb-2">{name}</p>
+                                    <div className="workout-grid mb-1 px-1 text-center">
+                                        <span className="text-[8px] font-black uppercase text-slate-300">Set</span>
+                                        <span className="text-[8px] font-black uppercase text-slate-300">Lbs</span>
+                                        <span className="text-[8px] font-black uppercase text-slate-300">Reps</span>
+                                        <span className="text-[8px] font-black uppercase text-slate-300">Diff</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {sets.map((s, sIdx) => (
+                                            <div key={sIdx} className="workout-grid">
+                                                <div className="text-center font-bold text-slate-400 text-xs">{sIdx + 1}</div>
+                                                <input disabled className="bg-white p-1.5 rounded-lg text-center font-bold text-xs text-slate-600 border border-slate-200" value={s.weight} />
+                                                <input disabled className="bg-white p-1.5 rounded-lg text-center font-bold text-xs text-slate-600 border border-slate-200" value={s.reps} />
+                                                <div className="text-center text-xs">{s.difficulty}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
