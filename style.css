@@ -1,40 +1,28 @@
 /* --- TYPOGRAPHY --- */
-h1, h2, h3, .retro-font {
-    font-family: 'Press Start 2P', cursive;
-    line-height: 1.5;
+body {
+    font-family: 'Nunito', sans-serif;
 }
 
-body, p, input, button, span, div {
-    font-family: 'VT323', monospace;
-    font-size: 1.1rem; /* Bumped up slightly for readability on terminal font */
+/* --- KAWAI CARD STYLES --- */
+.kawaii-card {
+    background: white;
+    border-radius: 1.5rem; /* rounded-3xl */
+    box-shadow: 0 10px 25px -5px rgba(165, 216, 255, 0.4), 0 8px 10px -6px rgba(165, 216, 255, 0.1);
+    border: 1px solid white;
 }
 
-/* --- EFFECTS --- */
-.neon-text {
-    text-shadow: 0 0 5px #d946ef, 0 0 10px #d946ef;
+.kawaii-input {
+    background-color: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 1rem;
+    transition: all 0.2s ease;
 }
 
-.glass-panel {
-    background: rgba(22, 33, 62, 0.85);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(6, 182, 212, 0.5); /* Cyan border */
-    box-shadow: 0 0 15px rgba(6, 182, 212, 0.2), inset 0 0 20px rgba(0, 0, 0, 0.5);
-}
-
-/* --- TERMINAL INPUTS --- */
-input, select {
-    background-color: #000 !important;
-    color: #4ade80 !important; /* Terminal Green */
-    border: 1px solid #333 !important;
-    font-family: 'VT323', monospace;
-    letter-spacing: 1px;
-}
-
-input:focus, select:focus {
-    border-color: #d946ef !important; /* Pink focus */
+.kawaii-input:focus {
+    border-color: #a5d8ff;
+    background-color: white;
     outline: none;
-    box-shadow: 0 0 8px rgba(217, 70, 239, 0.6);
+    box-shadow: 0 0 0 4px rgba(165, 216, 255, 0.3);
 }
 
 /* --- UTILITIES --- */
@@ -48,10 +36,26 @@ input:focus, select:focus {
 
 /* Safe Area for Mobile */
 .safe-pb {
-    padding-bottom: env(safe-area-inset-bottom, 80px);
+    padding-bottom: env(safe-area-inset-bottom, 90px);
 }
 
 /* --- ANIMATIONS --- */
+@keyframes bounce-gentle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+.animate-bounce-gentle {
+    animation: bounce-gentle 2s infinite ease-in-out;
+}
+
+@keyframes pop-in {
+    0% { transform: scale(0.95); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+.animate-pop {
+    animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
 @keyframes swat {
     0% { transform: translateX(-100%) rotate(-10deg); }
     50% { transform: translateX(0) rotate(0deg); }
@@ -59,17 +63,4 @@ input:focus, select:focus {
 }
 .animate-swat {
     animation: swat 1.2s ease-in-out forwards;
-}
-
-@keyframes pop {
-    0% { transform: scale(0.9); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
-}
-.animate-pop {
-    animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-/* Chart.js Canvas Fix for Dark Mode */
-canvas {
-    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.1));
 }
