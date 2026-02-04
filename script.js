@@ -5,7 +5,7 @@ const GOALS = { calories: 1645, carbs: 160, protein: 150, fat: 45, fiber: 38 };
 const USER_WEIGHT_KG = 73; 
 const BASE_BMR = 1600;
 
-// UPDATE 2: Refined Workouts & Targets
+// WORKOUT DATA
 const WORKOUTS = {
     A: {
         name: "Workout A (Push)",
@@ -122,13 +122,15 @@ function App() {
     const [finishModalOpen, setFinishModalOpen] = useState(false);
     const [successModalData, setSuccessModalData] = useState(null); 
     const [swatTrigger, setSwatTrigger] = useState(false);
-    // UPDATE 3: View History Modal State
     const [viewHistoryItem, setViewHistoryItem] = useState(null);
     
     // Inputs
     const [editFood, setEditFood] = useState({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack', measure: 'g' });
-    // UPDATE 1: Store the base item for reactive math
     const [selectedBaseItem, setSelectedBaseItem] = useState(null);
+
+    // FEATURE 2.5: Edit Library Mode
+    const [isLibraryEditMode, setIsLibraryEditMode] = useState(false);
+    const [baseEditValues, setBaseEditValues] = useState({});
 
     const [librarySearch, setLibrarySearch] = useState('');
     const [isNew, setIsNew] = useState(true);
@@ -177,19 +179,19 @@ function App() {
 
     // Data Persistence
     useEffect(() => {
-        const saved = localStorage.getItem('meow_data_v9'); // Version bump for 2.4
+        const saved = localStorage.getItem('meow_data_v10'); // Version bump for 2.5
         if (saved) {
             const parsed = JSON.parse(saved);
             if (!parsed.fitnessHistory) parsed.fitnessHistory = {};
             setData(parsed);
         } else {
-            const old = localStorage.getItem('meow_data_v8');
+            const old = localStorage.getItem('meow_data_v9');
             if(old) setData(JSON.parse(old));
         }
     }, []);
 
     useEffect(() => {
-        localStorage.setItem('meow_data_v9', JSON.stringify(data));
+        localStorage.setItem('meow_data_v10', JSON.stringify(data));
     }, [data]);
 
     // Timer Loop
@@ -241,11 +243,9 @@ function App() {
         });
     };
 
-    // UPDATE 1: Reactive Food Math Handler
+    // Reactive Food Math Handler
     const handleWeightChange = (val) => {
         const newWeight = Number(val);
-        
-        // If we have a base item, recalculate macros
         if (selectedBaseItem) {
             const baseAmount = selectedBaseItem.measure === 'unit' ? 1 : 100;
             const ratio = newWeight / baseAmount;
@@ -259,7 +259,6 @@ function App() {
                 fiber: parseFloat((selectedBaseItem.fiber * ratio).toFixed(1))
             });
         } else {
-            // Manual entry mode, just update weight
             setEditFood({ ...editFood, weight: newWeight });
         }
     };
@@ -277,14 +276,13 @@ function App() {
             category: editFood.category
         };
 
-        // UPDATE 1: Save last used amount to Library
         let newLib = [...data.library];
         const existingIdx = newLib.findIndex(i => i.name === editFood.name);
         if (existingIdx >= 0) {
             newLib[existingIdx] = { 
                 ...newLib[existingIdx], 
                 lastUsed: Date.now(),
-                lastAmount: editFood.weight // Memory feature
+                lastAmount: editFood.weight 
             };
         } else {
             newLib.push({ ...editFood, id: Date.now().toString(), lastUsed: Date.now() });
@@ -302,11 +300,9 @@ function App() {
     };
 
     const openAddFood = (item = null) => {
+        setIsLibraryEditMode(false); // Reset edit mode
         if (item) {
-            // UPDATE 1: Use Memory (lastAmount) if available, otherwise default
             const startWeight = item.lastAmount || (item.measure === 'unit' ? 1 : 100);
-            
-            // Calculate initial macros based on startWeight
             const baseAmount = item.measure === 'unit' ? 1 : 100;
             const ratio = startWeight / baseAmount;
 
@@ -319,19 +315,49 @@ function App() {
                 fiber: parseFloat((item.fiber * ratio).toFixed(1)),
                 measure: item.measure || 'g' 
             });
-            setSelectedBaseItem(item); // Enable reactive math
+            setSelectedBaseItem(item); 
             setIsNew(false);
         } else {
             setEditFood({ name: '', weight: 100, carbs: 0, protein: 0, fat: 0, fiber: 0, category: 'Snack', measure: 'g' });
-            setSelectedBaseItem(null); // Manual mode
+            setSelectedBaseItem(null); 
             setIsNew(true);
         }
         setModalOpen(true);
     };
 
+    // FEATURE 2.5: Handle Edit Library Source
+    const handleStartEditLibrary = () => {
+        setBaseEditValues({ ...selectedBaseItem });
+        setIsLibraryEditMode(true);
+    };
+
+    const handleSaveLibraryEdit = () => {
+        // 1. Update the item in the Library
+        const updatedItem = { ...baseEditValues };
+        const newLib = data.library.map(i => i.id === updatedItem.id ? updatedItem : i);
+        
+        setData({...data, library: newLib});
+        setSelectedBaseItem(updatedItem); // Update base reference
+
+        // 2. Recalculate current Calculator view based on new base values
+        const baseAmount = updatedItem.measure === 'unit' ? 1 : 100;
+        const ratio = editFood.weight / baseAmount;
+        
+        setEditFood({
+            ...editFood,
+            name: updatedItem.name, // Update Name if changed
+            carbs: parseFloat((updatedItem.carbs * ratio).toFixed(1)),
+            protein: parseFloat((updatedItem.protein * ratio).toFixed(1)),
+            fat: parseFloat((updatedItem.fat * ratio).toFixed(1)),
+            fiber: parseFloat((updatedItem.fiber * ratio).toFixed(1))
+        });
+
+        // 3. Exit Edit Mode
+        setIsLibraryEditMode(false);
+    };
+
     const handleFinishWorkout = () => {
         const duration = parseInt(workoutDuration) || 0;
-        // UPDATE 2: 6 Cals per Minute Logic
         const burned = duration * 6;
         
         const workoutLog = {
@@ -543,7 +569,6 @@ function App() {
                                         <h3 className="font-bold text-slate-800 text-sm">{ex.name}</h3>
                                         {timeLeft > 0 && <span className="text-xs font-mono text-pink-500 font-bold animate-pulse">{timeLeft}s</span>}
                                     </div>
-                                    {/* UPDATE 2: Targets */}
                                     <div className="flex flex-col">
                                         <p className="text-[10px] font-black text-pink-400 uppercase">Goal: {ex.target}</p>
                                         <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[200px]">{lastSummary}</p>
@@ -624,7 +649,6 @@ function App() {
                         let vol = 0;
                         Object.values(w.exercises || {}).forEach(sets => sets.forEach(s => vol += (s.weight||0)*(s.reps||0)));
                         return (
-                            // UPDATE 3: Clickable Log Item
                             <div key={w.id} onClick={() => setViewHistoryItem(w)} className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-400 active:scale-95 transition-transform cursor-pointer">
                                 <div className="flex justify-between items-start">
                                     <div>
@@ -685,41 +709,83 @@ function App() {
                 <button onClick={() => setView('trends')} className={`p-3 rounded-full transition-all ${view==='trends'?'bg-pink-100 text-pink-500':'text-slate-400'}`}><span className="material-icons-round text-xl">insights</span></button>
             </nav>
 
-            {/* Add Food Modal */}
+            {/* Add Food / Edit Library Modal */}
             {modalOpen && (
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick={() => setModalOpen(false)}>
                     <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10" onClick={e => e.stopPropagation()}>
+                        
+                        {/* FEATURE 2.5: Header with Edit Toggle */}
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-black text-slate-800 uppercase">{isNew ? 'New Entry' : 'Add Food'}</h2>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-black text-slate-800 uppercase">
+                                    {isLibraryEditMode ? 'Edit Library' : (isNew ? 'New Entry' : 'Add Food')}
+                                </h2>
+                                {/* Show Pencil if it's a library item and we are not already editing it */}
+                                {selectedBaseItem && !isLibraryEditMode && (
+                                    <button onClick={handleStartEditLibrary} className="text-slate-400 hover:text-pink-500 transition-colors">
+                                        <span className="material-icons-round text-lg">edit</span>
+                                    </button>
+                                )}
+                            </div>
                             <button onClick={() => setModalOpen(false)} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center font-bold">&times;</button>
                         </div>
-                        <div className="space-y-4 max-h-[70vh] overflow-y-auto no-scrollbar">
-                            <div className="bg-slate-100 p-1 rounded-xl flex mb-2">
-                                {['g', 'unit'].map(m => (
-                                    <button key={m} onClick={() => setEditFood({...editFood, measure: m})} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${editFood.measure === m ? 'bg-white shadow text-pink-500' : 'text-slate-400'}`}>{m === 'g' ? 'Grams (Weight)' : 'Units (Qty)'}</button>
-                                ))}
-                            </div>
-                            <input className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none text-xs" value={editFood.name} onChange={e => setEditFood({...editFood, name: e.target.value})} placeholder="Food Name" />
-                            
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">{editFood.measure === 'g' ? 'Weight (g)' : 'Quantity'}</label>
-                                {/* UPDATE 1: Reactive Weight Input */}
-                                <input type="number" className="w-full bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none text-center" value={editFood.weight} onChange={e => handleWeightChange(e.target.value)} />
-                            </div>
 
-                            <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                                <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Macros (Auto-Calc if Library Item)</p>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {['carbs', 'protein', 'fat', 'fiber'].map(m => (
-                                        <div key={m}>
-                                            <label className="text-[8px] font-bold uppercase text-slate-400 block text-center mb-1">{m}</label>
-                                            <input type="number" className="w-full p-2 rounded-xl text-center font-bold text-xs" value={editFood[m]} onChange={e => setEditFood({...editFood, [m]: Number(e.target.value)})} />
-                                        </div>
+                        {/* FEATURE 2.5: Conditional Body Content */}
+                        {isLibraryEditMode ? (
+                            <div className="space-y-4">
+                                <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
+                                    <p className="text-xs font-bold text-amber-600 flex items-center gap-1">
+                                        <span className="material-icons-round text-sm">warning</span> 
+                                        Editing Base Values (per 100g / 1 Unit)
+                                    </p>
+                                </div>
+                                
+                                <div>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Food Name</label>
+                                    <input className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none text-sm" value={baseEditValues.name} onChange={e => setBaseEditValues({...baseEditValues, name: e.target.value})} />
+                                </div>
+
+                                <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                                    <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Base Macros (per 100g / 1 Unit)</p>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {['carbs', 'protein', 'fat', 'fiber'].map(m => (
+                                            <div key={m}>
+                                                <label className="text-[8px] font-bold uppercase text-slate-400 block text-center mb-1">{m}</label>
+                                                <input type="number" className="w-full p-2 rounded-xl text-center font-bold text-xs bg-white border border-slate-200" value={baseEditValues[m]} onChange={e => setBaseEditValues({...baseEditValues, [m]: Number(e.target.value)})} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button onClick={handleSaveLibraryEdit} className="w-full bg-amber-500 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-amber-600 active:scale-95 transition-transform">Save Changes 💾</button>
+                            </div>
+                        ) : (
+                            <div className="space-y-4 max-h-[70vh] overflow-y-auto no-scrollbar">
+                                <div className="bg-slate-100 p-1 rounded-xl flex mb-2">
+                                    {['g', 'unit'].map(m => (
+                                        <button key={m} onClick={() => setEditFood({...editFood, measure: m})} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${editFood.measure === m ? 'bg-white shadow text-pink-500' : 'text-slate-400'}`}>{m === 'g' ? 'Grams (Weight)' : 'Units (Qty)'}</button>
                                     ))}
                                 </div>
+                                <input className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none text-xs" value={editFood.name} onChange={e => setEditFood({...editFood, name: e.target.value})} placeholder="Food Name" />
+                                
+                                <div>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-2">{editFood.measure === 'g' ? 'Weight (g)' : 'Quantity'}</label>
+                                    <input type="number" className="w-full bg-slate-50 p-4 rounded-2xl font-bold text-2xl outline-none text-center" value={editFood.weight} onChange={e => handleWeightChange(e.target.value)} />
+                                </div>
+
+                                <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                                    <p className="text-[10px] font-black text-center text-slate-400 uppercase mb-3">Macros (Auto-Calc if Library Item)</p>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {['carbs', 'protein', 'fat', 'fiber'].map(m => (
+                                            <div key={m}>
+                                                <label className="text-[8px] font-bold uppercase text-slate-400 block text-center mb-1">{m}</label>
+                                                <input type="number" className="w-full p-2 rounded-xl text-center font-bold text-xs" value={editFood[m]} onChange={e => setEditFood({...editFood, [m]: Number(e.target.value)})} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button onClick={handleAddFood} className="w-full bg-pink-500 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-pink-600 active:scale-95 transition-transform">Add to Bowl 🥣</button>
                             </div>
-                            <button onClick={handleAddFood} className="w-full bg-pink-500 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-pink-600 active:scale-95 transition-transform">Add to Bowl 🥣</button>
-                        </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -738,7 +804,7 @@ function App() {
                 </div>
             )}
 
-            {/* UPDATE 3: View History Modal (Read Only) */}
+            {/* View History Modal */}
             {viewHistoryItem && (
                 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewHistoryItem(null)}>
                     <div className="bg-white w-full max-w-sm max-h-[80vh] overflow-y-auto rounded-[2rem] p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
