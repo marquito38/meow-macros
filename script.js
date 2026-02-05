@@ -54,7 +54,7 @@ const calcCals = (c, p, f) => Math.round((c * 4) + (p * 4) + (f * 9));
 
 // --- COMPONENTS ---
 const CatGif = ({ type, className }) => {
-    // Reliable GitHub-hosted animated cat
+    // Reliable GitHub-hosted animated cat (v3.6 Stable Asset)
     const gifUrl = "https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Cat%20Face.png";
     const fallbacks = { swat: "🐾", happy: "😻", sleep: "💤", workout: "🏋️‍♀️" };
     
@@ -375,7 +375,7 @@ function App() {
                                 <div key={w.id} onClick={() => setViewHistoryItem(w)} className="kawaii-card p-4 border-l-4 border-blue-300 shadow-sm cursor-pointer hover:bg-blue-50 transition-colors">
                                     <div className="flex justify-between items-start">
                                         <div><p className="font-bold text-slate-600 text-sm">{routineName}</p><span className="text-[10px] text-slate-400">{w.date}</span><p className="text-xs font-bold text-blue-400">{w.calories} kcal</p><p className="text-[10px] text-slate-400 mt-1">Vol: <span className="font-black text-slate-600">{vol.toLocaleString()} lbs</span></p></div>
-                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteWorkout(w.id, w.date); }} className="text-slate-300 hover:text-red-400 p-2"><span className="material-icons-round text-lg">delete</span></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteWorkout(w.id, logDate); }} className="text-slate-300 hover:text-red-400 p-2"><span className="material-icons-round text-lg">delete</span></button>
                                     </div>
                                 </div>
                             );
@@ -433,12 +433,21 @@ function App() {
                 <ProgressBar current={totals.f} max={GOALS.fat} colorClass="bg-yellow-200" label="Fat" reverse={true} />
                 <ProgressBar current={totals.fib} max={GOALS.fiber} colorClass="bg-teal-200" label="Fiber" reverse={false} />
             </div>
-            <button onClick={() => openAddFood()} className="w-full bg-blue-300 text-white p-4 rounded-3xl shadow-lg font-bold flex flex-row items-center justify-center gap-2 hover:bg-blue-400 active:scale-95 transition-all"><span className="material-icons-round text-2xl">add_circle</span> Add Food</button>
+            {/* UPDATED: Mint Green Primary Action Button */}
+            <button onClick={() => openAddFood()} className="w-full btn-mint text-white p-4 rounded-3xl font-bold flex flex-row items-center justify-center gap-2 active:scale-95 transition-all">
+                <span className="material-icons-round text-2xl">add_circle</span> Add Food
+            </button>
             <div className="space-y-3">
                 <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2">Today's Bowl</h3>
                 {!todayLog.length ? <div className="text-center py-10 opacity-70"><CatGif type="sleep" className="w-32 h-32 mx-auto mb-2 opacity-50 grayscale" /><p className="text-xs font-bold uppercase text-slate-400">Empty Bowl...</p></div> : todayLog.map(item => (
                     <div key={item.id} className="kawaii-card p-4 flex justify-between items-center">
-                        <div><div className="flex items-center gap-2"><span className="text-[10px] bg-blue-50 text-blue-400 px-2 py-1 rounded-lg font-black uppercase">{item.category}</span><p className="font-bold text-slate-600 text-sm">{item.name}</p></div><p className="text-[10px] text-slate-400 font-bold uppercase mt-1 ml-1">{item.weight}{item.measure} • {Math.round(calcCals(item.c, item.p, item.f))} cal • <span className="text-teal-400">{item.fib.toFixed(1)}g Fib</span></p></div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                {/* CATEGORY TAGS REMOVED PER v3.6 REQUEST */}
+                                <p className="font-bold text-slate-600 text-sm">{item.name}</p>
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 ml-1">{item.weight}{item.measure} • {Math.round(calcCals(item.c, item.p, item.f))} cal • <span className="text-teal-400">{item.fib.toFixed(1)}g Fib</span></p>
+                        </div>
                         <button onClick={() => setData({...data, history: {...data.history, [date]: todayLog.filter(i=>i.id!==item.id)}})} className="bg-red-50 text-red-300 p-2 rounded-xl hover:bg-red-100 transition-colors"><span className="material-icons-round text-lg">delete</span></button>
                     </div>
                 ))}
@@ -454,20 +463,27 @@ function App() {
             <div className="space-y-6 px-2">
                 {WORKOUTS[activeRoutine].exercises.map((ex, idx) => {
                     const lastSummary = formatLastLog(ex.name); const timeLeft = timers[ex.name] || 0;
-                    const currentSets = workoutInputs[ex.name] || Array(ex.sets).fill({weight:0, reps:0, difficulty:'😼'});
+                    // UPDATED: Default difficulty set to moderate
+                    const currentSets = workoutInputs[ex.name] || Array(ex.sets).fill({weight:0, reps:0, difficulty:'😏'});
                     return (
                         <div key={idx} className="kawaii-card p-4">
                             <div className="flex justify-between items-center mb-4"><div className="flex-1"><div className="flex items-center gap-2"><h3 className="font-bold text-slate-700 text-sm">{ex.name}</h3>{timeLeft > 0 && <span className="text-xs font-bold text-blue-400 animate-pulse bg-blue-50 px-2 py-1 rounded-lg">{timeLeft}s</span>}</div><div className="flex flex-col mt-1"><p className="text-[10px] font-black text-blue-300 uppercase italic">{ex.target}</p><p className="text-[10px] font-bold text-slate-400 uppercase">{lastSummary}</p></div></div><button onClick={() => setTimers(prev => ({...prev, [ex.name]: prev[ex.name]>0 ? 0 : 90}))} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-colors shadow-sm ${timeLeft > 0 ? 'bg-red-100 text-red-400' : 'bg-slate-100 text-slate-500'}`}>{timeLeft > 0 ? 'Stop' : 'Rest'}</button></div>
                             <div className="grid grid-cols-4 gap-2 mb-2 text-center px-1 font-black text-[9px] uppercase text-slate-300"><span>Set</span><span>Lbs</span><span>Reps</span><span>Feel</span></div>
                             <div className="space-y-2">{Array.from({length: ex.sets}).map((_, setIdx) => {
-                                const setData = currentSets[setIdx] || {weight: 0, reps: 0, difficulty: '😼'};
-                                const updateSet = (field, val) => { const newSets = [...currentSets]; while(newSets.length <= setIdx) newSets.push({weight:0, reps:0, difficulty:'😼'}); newSets[setIdx] = { ...newSets[setIdx], [field]: val }; setWorkoutInputs({ ...workoutInputs, [ex.name]: newSets }); };
+                                const setData = currentSets[setIdx] || {weight: 0, reps: 0, difficulty: '😏'};
+                                const updateSet = (field, val) => { const newSets = [...currentSets]; while(newSets.length <= setIdx) newSets.push({weight:0, reps:0, difficulty:'😏'}); newSets[setIdx] = { ...newSets[setIdx], [field]: val }; setWorkoutInputs({ ...workoutInputs, [ex.name]: newSets }); };
                                 return (
                                     <div key={setIdx} className="grid grid-cols-4 gap-2">
                                         <div className="flex items-center justify-center font-black text-blue-200 text-sm bg-blue-50 rounded-xl">{setIdx + 1}</div>
                                         <input type="number" className="kawaii-input p-2 text-center font-bold text-xs" value={setData.weight} onChange={e => updateSet('weight', Number(e.target.value))} />
                                         <input type="number" className="kawaii-input p-2 text-center font-bold text-xs" value={setData.reps} onChange={e => updateSet('reps', Number(e.target.value))} />
-                                        <select className="kawaii-input p-1 text-center text-xs appearance-none" value={setData.difficulty} onChange={e => updateSet('difficulty', e.target.value)}><option>😺</option><option>😼</option><option>🙀</option></select>
+                                        {/* UPDATED: High Contrast Intensity Emojis */}
+                                        <select className="kawaii-input p-1 text-center text-xs appearance-none" value={setData.difficulty} onChange={e => updateSet('difficulty', e.target.value)}>
+                                            <option value="😊">😊 Easy</option>
+                                            <option value="😏">😏 Mod</option>
+                                            <option value="😫">😫 Hard</option>
+                                            <option value="💀">💀 Fail</option>
+                                        </select>
                                     </div>
                                 );
                             })}</div>
@@ -508,7 +524,10 @@ function App() {
                 <div className="fixed inset-0 z-50 bg-blue-900/20 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick={() => setFinishModalOpen(false)}><div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10 border-4 border-blue-50" onClick={e => e.stopPropagation()}><h2 className="text-xl font-black text-blue-400 uppercase mb-6 text-center">Great Job!</h2><div className="mb-6"><label className="text-[10px] font-black uppercase text-slate-400 ml-1 mb-1 block">Minutes Spent</label><input type="number" className="kawaii-input w-full p-4 font-black text-3xl text-center text-blue-400" value={workoutDuration} onChange={e => setWorkoutDuration(e.target.value)} /></div><button onClick={handleFinishWorkout} className="w-full bg-blue-400 text-white py-4 rounded-2xl font-black uppercase shadow-lg flex items-center justify-center gap-2"><span className="material-icons-round text-xl">save</span> Save Workout</button></div></div>
             )}
             {viewHistoryItem && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewHistoryItem(null)}><div className="bg-white w-full max-w-sm max-h-[80vh] overflow-y-auto rounded-[2.5rem] p-6 shadow-2xl no-scrollbar" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-6"><div><h2 className="text-lg font-black text-slate-700">{WORKOUTS[viewHistoryItem.routine]?.name || "Workout"}</h2><p className="text-xs text-slate-400 font-bold">{viewHistoryItem.date} • {viewHistoryItem.duration} min • {viewHistoryItem.calories} kcal</p></div><button onClick={() => setViewHistoryItem(null)} className="bg-slate-50 p-2 rounded-full text-slate-400 hover:text-red-400 transition-colors"><span className="material-icons-round text-base">close</span></button></div><div className="space-y-4">{Object.entries(viewHistoryItem.exercises).map(([name, sets], idx) => <div key={idx} className="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p className="font-bold text-slate-600 text-sm mb-2">{name}</p><div className="grid grid-cols-4 gap-2 mb-1 px-1 text-center font-black uppercase text-slate-400 text-[8px]"><span>Set</span><span>Lbs</span><span>Reps</span><span>Feel</span></div><div className="space-y-1">{sets.map((s, sIdx) => <div key={sIdx} className="grid grid-cols-4 gap-2"><div className="text-center font-bold text-blue-300 text-xs bg-white rounded-lg py-1">{sIdx + 1}</div><input disabled className="bg-white p-1 text-center font-bold text-xs text-slate-600 rounded-lg" value={s.weight} /><input disabled className="bg-white p-1 text-center font-bold text-xs text-slate-600 rounded-lg" value={s.reps} /><div className="text-center text-xs py-1">{s.difficulty}</div></div>)}</div></div>)}</div></div></div>
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewHistoryItem(null)}><div className="bg-white w-full max-w-sm max-h-[80vh] overflow-y-auto rounded-[2.5rem] p-6 shadow-2xl no-scrollbar" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-6"><div><h2 className="text-lg font-black text-slate-700">{WORKOUTS[viewHistoryItem.routine]?.name || "Workout"}</h2><p className="text-xs text-slate-400 font-bold">{viewHistoryItem.date} • {viewHistoryItem.duration} min • {viewHistoryItem.calories} kcal</p></div><button onClick={() => setViewHistoryItem(null)} className="bg-slate-50 p-2 rounded-full text-slate-400 hover:text-red-400 transition-colors"><span className="material-icons-round text-base">close</span></button></div><div className="space-y-4">{Object.entries(viewHistoryItem.exercises).map(([name, sets], idx) => <div key={idx} className="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p className="font-bold text-slate-600 text-sm mb-2">{name}</p><div className="grid grid-cols-4 gap-2 mb-1 px-1 text-center font-black uppercase text-slate-400 text-[8px]"><span>Set</span><span>Lbs</span><span>Reps</span><span>Feel</span></div><div className="space-y-1">{sets.map((s, sIdx) => <div key={sIdx} className="grid grid-cols-4 gap-2"><div className="text-center font-bold text-blue-300 text-xs bg-white rounded-lg py-1">{sIdx + 1}</div><input disabled className="bg-white p-1 text-center font-bold text-xs text-slate-600 rounded-lg" value={s.weight} /><input disabled className="bg-white p-1 text-center font-bold text-xs text-slate-600 rounded-lg" value={s.reps} /><div className="text-center text-xs py-1">
+                                                {/* UPDATED: Emojis match intensity v3.6 */}
+                                                {s.difficulty}
+                                            </div></div>)}</div></div>)}</div></div></div>
             )}
         </div>
     );
