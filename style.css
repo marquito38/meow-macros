@@ -3,6 +3,13 @@ body {
     font-family: 'Nunito', sans-serif;
 }
 
+/* --- PROTOTYPE BACKGROUND --- */
+body {
+    background-color: #eff6ff; /* blue-50 */
+    background-image: radial-gradient(#dbeafe 2px, transparent 2px);
+    background-size: 32px 32px;
+}
+
 /* --- KAWAI CARD STYLES --- */
 .kawaii-card {
     background: white;
@@ -23,6 +30,15 @@ body {
     background-color: white;
     outline: none;
     box-shadow: 0 0 0 4px rgba(165, 216, 255, 0.3);
+}
+
+/* --- SPECIAL BUTTONS --- */
+.btn-mint {
+    background-color: #34d399;
+    box-shadow: 0 8px 20px -4px rgba(52, 211, 153, 0.4);
+}
+.btn-mint:hover {
+    background-color: #10b981;
 }
 
 /* --- UTILITIES --- */
